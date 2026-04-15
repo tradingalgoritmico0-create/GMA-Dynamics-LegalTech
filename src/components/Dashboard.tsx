@@ -153,7 +153,11 @@ const processPayment = async (e: React.FormEvent) => {
       const { error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
       if (rpcError) throw new Error("Error al incrementar contador: " + rpcError.message);
       
-      setAccount(prev => prev ? { ...prev, sent: prev.sent + 1 } : null);
+      // Refresco forzado desde la fuente de verdad (Supabase)
+      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', (await supabase.auth.getUser()).data.user?.id).single();
+      if (updatedProfile) {
+        setAccount(prev => prev ? { ...prev, sent: updatedProfile.sent_msgs } : null);
+      }
       setNotifications(prev => [{ id: newNotif.id, caseName: formData.caseName, date: new Date().toLocaleString(), recipient: formData.phone, email: formData.email, status: 'Enviado', emailStatus: 'Enviado', hash: fileHash, owner: user }, ...prev]);
       addLog("✅ Certificado judicial emitido.");
       setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
