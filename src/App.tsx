@@ -36,15 +36,16 @@ function App() {
         const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
         if (profile?.status === 'Activo') {
+          // Solo los usuarios con suscripción activa entran directo al Dashboard
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          // Si no es activo o no existe, FORZAR LOGIN (Muro de Pago)
-          console.warn("Acceso Restringido: Requiere activación de cuenta.");
+          // Si la cuenta no está activa, lo mantenemos en la Landing por profesionalismo
+          // El usuario decidirá cuándo entrar al flujo de pago haciendo clic en Acceso
           setUser(session.user.email || '');
           setRole('user');
-          setView('login');
+          setView('landing');
         }
       } else {
         setView('landing');
@@ -54,12 +55,10 @@ function App() {
     checkInitialSession();
 
     // 2. Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        // Solo redirigir si no somos admin
-        if (localStorage.getItem('gma_role') !== 'admin') {
-          setView('login'); // El componente Login manejará si muestra el Muro de Pago
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
+      if (event === 'SIGNED_IN') {
+        // Refrescar estatus de sesión para decidir vista
+        checkInitialSession();
       } else if (event === 'SIGNED_OUT') {
         setView('landing');
         setUser(null);
