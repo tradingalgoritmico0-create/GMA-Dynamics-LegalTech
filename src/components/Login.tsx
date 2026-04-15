@@ -92,32 +92,36 @@ const Login = ({ onLogin }: LoginProps) => {
     setIsRegistering(false);
   };
 
-  const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '' });
+  const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '', docType: 'CC', docNumber: '' });
 
   const onPaymentCompleted = async () => {
     if (!acceptTerms) return alert('Debe aceptar los términos legales.');
-    if (!cardData.number || !cardData.expiry || !cardData.cvc) return alert('Complete los datos de la tarjeta.');
+    if (!cardData.number || !cardData.expiry || !cardData.cvc || !cardData.docNumber) return alert('Complete todos los datos de pago e identificación.');
 
     setIsProcessing(true);
     try {
       const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
       const [month, year] = cardData.expiry.split('/');
       
+      console.log("Iniciando Tokenización con Mercado Pago...");
       const cardToken = await mp.createCardToken({
         cardNumber: cardData.number.replace(/\s/g, ''),
         cardholderName: fullName || 'Abogado GMA',
         cardExpirationMonth: month,
         cardExpirationYear: '20' + year,
         securityCode: cardData.cvc,
-        identificationType: 'CC',
-        identificationNumber: '12345678'
+        identificationType: cardData.docType,
+        identificationNumber: cardData.docNumber
       });
 
-      if (!cardToken?.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
+      if (!cardToken?.id) {
+        console.error("Fallo de Tokenización:", cardToken);
+        throw new Error("Mercado Pago no pudo procesar la tarjeta. Verifique los datos o use otro medio.");
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       const user = pendingUser || session?.user;
-      if (!user) throw new Error("No hay sesión activa.");
+      if (!user) throw new Error("Sesión no encontrada. Reintente el inicio de sesión.");
 
       // ACTUALIZACIÓN CRÍTICA EN DB
       const { error: upErr } = await supabase.from('profiles').upsert({ 
@@ -130,11 +134,10 @@ const Login = ({ onLogin }: LoginProps) => {
       });
       
       if (upErr) throw upErr;
-      
-      // RECARGA ABSOLUTA: Fuerza al Guardián de App.tsx a re-validar todo
       window.location.reload();
     } catch (err: any) { 
-      alert("ERROR DE ACTIVACIÓN: " + (err.message || "Error en la pasarela.")); 
+      console.error("Error completo de pasarela:", err);
+      alert("ERROR: " + (err.message || "Fallo en la comunicación con la pasarela.")); 
     } finally { setIsProcessing(false); }
   };
 
@@ -188,6 +191,15 @@ const Login = ({ onLogin }: LoginProps) => {
                     setCardData({...cardData, expiry: val});
                   }} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
                   <input type="text" placeholder="CVC" value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value.replace(/\D/g, '').substring(0, 4)})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '1rem', marginTop: '1rem' }}>
+                  <select value={cardData.docType} onChange={e => setCardData({...cardData, docType: e.target.value})} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '0.9rem' }}>
+                    <option value="CC">CC</option>
+                    <option value="CE">CE</option>
+                    <option value="NIT">NIT</option>
+                    <option value="PP">Pasaporte</option>
+                  </select>
+                  <input type="text" placeholder="Nº Documento del Titular" value={cardData.docNumber} onChange={e => setCardData({...cardData, docNumber: e.target.value.replace(/\D/g, '')})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
                 </div>
               </div>
               <label style={{ display: 'flex', gap: '1rem', alignItems: 'center', cursor: 'pointer', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '12px' }}>
