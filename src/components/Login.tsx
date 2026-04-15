@@ -4,9 +4,6 @@ import { supabase } from '../lib/supabaseClient';
 import { DottedBackground } from './ui/Backgrounds';
 import TermsOfService from './TermsOfService';
 
-interface LoginProps {
-  // onLogin eliminada para seguridad centralizada en App.tsx
-}
 
 const Login = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -44,8 +41,7 @@ const Login = () => {
             setPendingUser(session.user);
             setMustPay(true);
           } else {
-            // Solo si el perfil es explícitamente Activo en DB permitimos onLogin
-            onLogin(session.user.email || '', 'user');
+            console.log("Sesión activa y perfil validado.");
           }
         } catch (err) { 
           console.error("Error validando estatus:", err);
@@ -54,7 +50,7 @@ const Login = () => {
       }
     };
     checkPaymentStatus();
-  }, [onLogin]);
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
