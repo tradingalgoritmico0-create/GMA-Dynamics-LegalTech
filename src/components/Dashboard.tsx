@@ -113,21 +113,20 @@ const processPayment = async (e: React.FormEvent) => {
     console.log("Validación Exitosa - Token:", cardToken.id);
 
     const { data: { user: authUser } } = await supabase.auth.getUser();
-...
-      if (!authUser || !account) throw new Error("Error de sesión");
-      if (paymentType === 'extra') {
-        const newLimit = account.limit + extraQty;
-        await supabase.from('profiles').update({ limit_msgs: newLimit }).eq('id', authUser.id);
-        setAccount({ ...account, limit: newLimit });
-      } else {
-        const newExpires = new Date(); newExpires.setDate(newExpires.getDate() + 30);
-        await supabase.from('profiles').update({ plan: selectedUpgradePlan.name, limit_msgs: selectedUpgradePlan.limit, sent_msgs: 0, status: 'Activo', updated_at: new Date().toISOString() }).eq('id', authUser.id);
-        setAccount({ ...account, plan: selectedUpgradePlan.name, limit: selectedUpgradePlan.limit, sent: 0, expiresAt: newExpires.toISOString() });
-      }
-      setShowPaymentModal(false);
-      alert("Transacción exitosa.");
-    } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
-  };
+    if (!authUser || !account) throw new Error("Error de sesión");
+    if (paymentType === 'extra') {
+      const newLimit = account.limit + extraQty;
+      await supabase.from('profiles').update({ limit_msgs: newLimit }).eq('id', authUser.id);
+      setAccount({ ...account, limit: newLimit });
+    } else {
+      const newExpires = new Date(); newExpires.setDate(newExpires.getDate() + 30);
+      await supabase.from('profiles').update({ plan: selectedUpgradePlan.name, limit_msgs: selectedUpgradePlan.limit, sent_msgs: 0, status: 'Activo', updated_at: new Date().toISOString() }).eq('id', authUser.id);
+      setAccount({ ...account, plan: selectedUpgradePlan.name, limit: selectedUpgradePlan.limit, sent: 0, expiresAt: newExpires.toISOString() });
+    }
+    setShowPaymentModal(false);
+    alert("Transacción exitosa.");
+  } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
+};
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,7 +303,10 @@ const processPayment = async (e: React.FormEvent) => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><span style={{ fontWeight: 700 }}>Total</span><span style={{ fontWeight: 900, fontSize: '1.3rem' }}>${(paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price).toLocaleString()}</span></div>
                 <form onSubmit={processPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
                   <input type="text" placeholder="Tarjeta" value={extraCard.number} onChange={e => setExtraCard({...extraCard, number: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}><input type="text" placeholder="MM/YY" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required /><input type="text" placeholder="CVC" style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required /></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <input type="text" placeholder="MM/YY" value={extraCard.expiry} onChange={e => setExtraCard({...extraCard, expiry: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                    <input type="text" placeholder="CVC" value={extraCard.cvc} onChange={e => setExtraCard({...extraCard, cvc: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                  </div>
                   <button type="submit" disabled={isProcessing} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900 }}>PAGAR AHORA</button>
                 </form>
               </div>
