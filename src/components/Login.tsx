@@ -130,14 +130,20 @@ const Login = ({ onLogin }: LoginProps) => {
         payment_id: `MP-${cardToken.id}`, 
         plan: currentPlan.name, 
         limit_msgs: currentPlan.limit, 
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        full_name: fullName || 'Abogado GMA'
       });
       
-      if (upErr) throw upErr;
+      if (upErr) {
+        console.error("Fallo crítico en Supabase:", upErr);
+        throw new Error(`Base de Datos rechazo activación: ${upErr.message}`);
+      }
+      
+      console.log("✅ Sistema Activo.");
       window.location.reload();
     } catch (err: any) { 
       console.error("Error completo de pasarela:", err);
-      alert("ERROR: " + (err.message || "Fallo en la comunicación con la pasarela.")); 
+      alert("FALLO CRÍTICO: " + (err.message || "Error en la pasarela de pago.")); 
     } finally { setIsProcessing(false); }
   };
 

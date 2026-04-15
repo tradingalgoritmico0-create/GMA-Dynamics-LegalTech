@@ -22,18 +22,19 @@ function App() {
     // 1. Verificar sesión inicial
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
-      const userEmail = session?.user?.email?.trim().toLowerCase();
-      
-      // A. BYPASS DE SUPER ADMIN (Robustez Total contra mayúsculas/espacios)
-      if (userEmail && superAdminEmail && userEmail === superAdminEmail) {
-        console.log("🛡️ Super Admin Identificado.");
-        handleLogin('admin', 'admin');
-        return;
-      }
+      const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'Admin2577@gma.co').trim().toLowerCase();
 
-      // B. VALIDACIÓN DE USUARIOS NORMALES
       if (session?.user) {
+        const userEmail = session.user.email?.trim().toLowerCase();
+
+        // A. PRIORIDAD ABSOLUTA: SUPER ADMIN
+        if (userEmail === superAdminEmail) {
+          console.log("🔓 Acceso Maestro Autorizado para:", userEmail);
+          handleLogin('admin', 'admin');
+          return;
+        }
+
+        // B. VALIDACIÓN DE USUARIOS NORMALES
         const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
         if (profile?.status === 'Activo') {
@@ -41,7 +42,7 @@ function App() {
           setRole('user');
           setView('dashboard');
         } else {
-          // Si la cuenta no está activa, lo dirigimos directamente al portal de activación (Login con Muro de Pago)
+          console.warn("🔒 Cuenta pendiente de activación.");
           setUser(session.user.email || '');
           setRole('user');
           setView('login');
