@@ -27,22 +27,31 @@ function App() {
       if (session?.user) {
         const userEmail = session.user.email?.trim().toLowerCase();
 
-        // A. PRIORIDAD ABSOLUTA: SUPER ADMIN
+        // A. ACCESO MAESTRO (Independiente de la base de datos)
         if (userEmail === superAdminEmail) {
-          console.log("🔓 Acceso Maestro Autorizado para:", userEmail);
-          handleLogin('admin', 'admin');
+          console.log("🔓 SUPER ADMIN DETECTADO.");
+          setRole('admin');
+          setUser(userEmail);
+          setView('admin');
           return;
         }
 
-        // B. VALIDACIÓN DE USUARIOS NORMALES
-        const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
+        // B. USUARIOS NORMALES
+        const { data: profile, error } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
-        if (profile?.status === 'Activo') {
+        if (!profile || error) {
+          // Si no hay perfil, lo enviamos al pago para que se cree
+          console.log("👤 Usuario Nuevo Detectado.");
+          setUser(session.user.email || '');
+          setRole('user');
+          setView('login');
+        } else if (profile.status === 'Activo') {
+          console.log("✅ Usuario Activo.");
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          console.warn("🔒 Cuenta pendiente de activación.");
+          console.log("🔒 Usuario Inactivo.");
           setUser(session.user.email || '');
           setRole('user');
           setView('login');
