@@ -30,23 +30,27 @@ const Login = ({ onLogin }: LoginProps) => {
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      if (localStorage.getItem('gma_role') === 'admin') return;
+      if (localStorage.getItem('gma_role') === 'admin' && localStorage.getItem('gma_user') === 'admin') return;
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setIsProcessing(true);
         try {
-          let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-          if (!profile) {
-            const { data: newProfile } = await supabase.from('profiles').insert([{ id: session.user.id, full_name: session.user.user_metadata?.full_name || 'Nuevo Abogado', status: 'Inactivo' }]).select().single();
-            profile = newProfile;
-          }
-          if (!profile || !profile.payment_id || profile.status !== 'Activo') {
+          const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+          
+          if (error || !profile || profile.status !== 'Activo') {
+            // Si el perfil no existe o no es Activo, forzamos Muro de Pago
+            console.warn("Sesión detectada pero cuenta Inactiva. Requiere activación.");
             setPendingUser(session.user);
             setMustPay(true);
           } else {
+            // Solo si el perfil es explícitamente Activo en DB permitimos onLogin
             onLogin(session.user.email || '', 'user');
           }
-        } catch (err) { console.error(err); } finally { setIsProcessing(false); }
+        } catch (err) { 
+          console.error("Error validando estatus:", err);
+          setMustPay(true); 
+        } finally { setIsProcessing(false); }
       }
     };
     checkPaymentStatus();
