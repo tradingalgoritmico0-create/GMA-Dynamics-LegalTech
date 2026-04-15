@@ -41,10 +41,10 @@ function App() {
           setRole('user');
           setView('dashboard');
         } else {
-          // Si la cuenta no está activa, lo mantenemos en la Landing por profesionalismo
+          // Si la cuenta no está activa, lo dirigimos directamente al portal de activación (Login con Muro de Pago)
           setUser(session.user.email || '');
           setRole('user');
-          setView('landing');
+          setView('login');
         }
       } else {
         setView('landing');

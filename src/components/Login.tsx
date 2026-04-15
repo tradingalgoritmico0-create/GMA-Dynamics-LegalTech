@@ -175,10 +175,19 @@ const Login = ({ onLogin }: LoginProps) => {
             <p style={{ color: '#64748b', marginBottom: '3rem' }}>Ingrese los datos de su tarjeta para habilitar la infraestructura judicial.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ backgroundColor: '#f8fafc', padding: '2rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                <input type="text" placeholder="Número de Tarjeta" value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '1rem' }} />
+                <input type="text" placeholder="Nombre del Titular" value={fullName} onChange={e => setFullName(e.target.value)} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '1rem' }} required />
+                <input type="text" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').substring(0, 16);
+                  const formatted = val.match(/.{1,4}/g)?.join(' ') || val;
+                  setCardData({...cardData, number: formatted});
+                }} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1', marginBottom: '1rem' }} required />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <input type="text" placeholder="MM/YY" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} />
-                  <input type="text" placeholder="CVC" value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} />
+                  <input type="text" placeholder="MM/YY" value={cardData.expiry} onChange={e => {
+                    let val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                    if (val.length >= 3) val = val.substring(0, 2) + '/' + val.substring(2);
+                    setCardData({...cardData, expiry: val});
+                  }} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                  <input type="text" placeholder="CVC" value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value.replace(/\D/g, '').substring(0, 4)})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
                 </div>
               </div>
               <label style={{ display: 'flex', gap: '1rem', alignItems: 'center', cursor: 'pointer', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '12px' }}>
