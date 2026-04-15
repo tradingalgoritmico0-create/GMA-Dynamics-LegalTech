@@ -114,9 +114,18 @@ const Login = ({ onLogin }: LoginProps) => {
         identificationNumber: cardData.docNumber
       });
 
+      if (cardToken?.error) {
+        console.error("Errores de Mercado Pago:", cardToken.error);
+        const errorMsg = cardToken.error.cause?.[0]?.id;
+        if (errorMsg === '205') throw new Error("Número de tarjeta inválido.");
+        if (errorMsg === '208' || errorMsg === '209') throw new Error("Fecha de expiración inválida.");
+        if (errorMsg === 'E301') throw new Error("Número de tarjeta incompleto.");
+        if (errorMsg === 'E302' || errorMsg === '224') throw new Error("Código de seguridad (CVV) inválido.");
+        throw new Error("La entidad bancaria rechazó la validación. Verifique sus datos.");
+      }
+
       if (!cardToken?.id) {
-        console.error("Fallo de Tokenización:", cardToken);
-        throw new Error("Mercado Pago no pudo procesar la tarjeta. Verifique los datos o use otro medio.");
+        throw new Error("No se pudo generar el certificado de pago. Intente con otra tarjeta.");
       }
 
       const { data: { session } } = await supabase.auth.getSession();
