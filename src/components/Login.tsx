@@ -90,12 +90,9 @@ const Login = ({ onLogin }: LoginProps) => {
 
     setIsProcessing(true);
     try {
-      // 1. INTEGRACIÓN CON MERCADO PAGO (Tokenización)
-      // Esto valida que la tarjeta sea REAL antes de proceder obligatoriamente
       const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
       const [month, year] = cardData.expiry.split('/');
       
-      // Creamos el token (Esto fallará si la tarjeta es falsa o los datos inválidos)
       const cardToken = await mp.createCardToken({
         cardNumber: cardData.number.replace(/\s/g, ''),
         cardholderName: fullName || 'Abogado GMA',
@@ -106,23 +103,31 @@ const Login = ({ onLogin }: LoginProps) => {
         identificationNumber: '12345678'
       });
 
-      if (!cardToken.id) throw new Error("Datos de tarjeta inválidos o rechazados.");
-      console.log("Pago Validado - Token ID:", cardToken.id);
+      if (!cardToken || !cardToken.id) {
+        throw new Error("La tarjeta fue rechazada o los datos son insuficientes. Verifique e intente de nuevo.");
+      }
+      
+      console.log("Pago Validado por MP - Token ID:", cardToken.id);
 
       const { data: { session } } = await supabase.auth.getSession();
       const userToUpdate = pendingUser || session?.user;
-      const { error } = await supabase.from('profiles').update({ 
+      
+      if (!userToUpdate) throw new Error("No se encontró una sesión de usuario válida.");
+
+      const { error: updateError } = await supabase.from('profiles').update({ 
         status: 'Activo', 
-        payment_id: `MP-${Date.now()}`, 
+        payment_id: `MP-TOKEN-${cardToken.id}`, 
         plan: currentPlan.name, 
         limit_msgs: currentPlan.limit, 
         updated_at: new Date().toISOString()
       }).eq('id', userToUpdate.id);
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+      
+      // Solo después de actualizar exitosamente la DB permitimos el ingreso
       onLogin(userToUpdate.email || '', 'user');
     } catch (err: any) { 
-      alert("Error en el pago: " + (err.message || "Verifique los datos de su tarjeta.")); 
+      alert("ERROR DE ACTIVACIÓN: " + (err.message || "Error en la pasarela de pago.")); 
     } finally { setIsProcessing(false); }
   };
 

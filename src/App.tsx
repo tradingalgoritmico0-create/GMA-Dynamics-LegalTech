@@ -45,7 +45,10 @@ function App() {
           setRole('user');
           setView('dashboard');
         } else {
-          // Si está logueado pero NO ha pagado, mandarlo al Login (Muro de Pago)
+          // REFUERZO DE SEGURIDAD: Si no es activo, forzar vista de pago
+          console.log("Acceso Denegado: Cuenta no activa. Dirigiendo a pasarela...");
+          setUser(session.user.email || '');
+          setRole('user');
           setView('login');
         }
       }
