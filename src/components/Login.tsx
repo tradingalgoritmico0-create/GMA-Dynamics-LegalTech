@@ -76,7 +76,18 @@ const Login = ({ onLogin }: LoginProps) => {
   };
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+    await supabase.auth.signInWithOAuth({ 
+      provider: 'google', 
+      options: { 
+        redirectTo: window.location.origin,
+        queryParams: { prompt: 'select_account' }
+      } 
+    });
+  };
+
+  const handleBackToLogin = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '' });
@@ -134,6 +145,13 @@ const Login = ({ onLogin }: LoginProps) => {
               <img src="https://img.icons8.com/color/48/000000/mercado-pago.png" alt="MP" style={{ marginBottom: '1rem' }} />
               <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', fontFamily: 'var(--font-serif)' }}>Elegir Plan</h2>
               <p style={{ color: '#94a3b8', fontSize: '1.1rem' }}>Suscripción Judicial vía Mercado Pago.</p>
+              {pendingUser && (
+                <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#60a5fa' }}>Identificado como:</p>
+                  <p style={{ margin: 0, fontWeight: 'bold' }}>{pendingUser.email}</p>
+                  <button onClick={handleBackToLogin} style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>Usar otra cuenta</button>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               {plans.map(p => (
