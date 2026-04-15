@@ -148,7 +148,11 @@ const processPayment = async (e: React.FormEvent) => {
       n8nData.set('file', encryptedFile); n8nData.append('hash', fileHash);
       await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
       const { data: newNotif } = await supabase.from('notifications').insert([{ case_name: formData.caseName, phone: formData.phone, email: formData.email, defendant_id: formData.defendantId, file_hash: fileHash, owner_id: (await supabase.auth.getUser()).data.user?.id }]).select().single();
-      await supabase.from('profiles').update({ sent_msgs: account.sent + 1 }).eq('id', (await supabase.auth.getUser()).data.user?.id);
+      
+      // Incrementar contador de forma atómica y segura
+      const { error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
+      if (rpcError) throw new Error("Error al incrementar contador: " + rpcError.message);
+      
       setAccount(prev => prev ? { ...prev, sent: prev.sent + 1 } : null);
       setNotifications(prev => [{ id: newNotif.id, caseName: formData.caseName, date: new Date().toLocaleString(), recipient: formData.phone, email: formData.email, status: 'Enviado', emailStatus: 'Enviado', hash: fileHash, owner: user }, ...prev]);
       addLog("✅ Certificado judicial emitido.");
