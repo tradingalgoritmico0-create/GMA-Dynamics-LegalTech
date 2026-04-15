@@ -156,12 +156,12 @@ const processPayment = async (e: React.FormEvent) => {
       // Refresco forzado desde la fuente de verdad (Supabase)
       const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', (await supabase.auth.getUser()).data.user?.id).single();
       if (updatedProfile) {
-        setAccount(prev => prev ? { ...prev, sent: updatedProfile.sent_msgs } : null);
-      }
-      setNotifications(prev => [{ id: newNotif.id, caseName: formData.caseName, date: new Date().toLocaleString(), recipient: formData.phone, email: formData.email, status: 'Enviado', emailStatus: 'Enviado', hash: fileHash, owner: user }, ...prev]);
-      addLog("✅ Certificado judicial emitido.");
-      setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
-    } catch (error: any) { addLog("❌ FALLO: " + error.message); } finally { setIsProcessing(false); }
+        // Refresco completo de dashboard tras éxito para sincronizar contador y notificaciones
+        await loadDashboardData();
+        addLog("✅ Certificado judicial emitido.");
+        setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
+        } catch (error: any) { addLog("❌ FALLO: " + error.message); } finally { setIsProcessing(false); }
+        };
   };
 
   const addLog = (msg: string) => { setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 8)); };
