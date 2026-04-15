@@ -111,17 +111,20 @@ const Login = ({ onLogin }: LoginProps) => {
       
       if (!userToUpdate) throw new Error("No se encontró una sesión de usuario válida.");
 
-      const { error: updateError } = await supabase.from('profiles').update({ 
+      // 2. ACTUALIZACIÓN CRÍTICA EN BASE DE DATOS
+      const { data: updatedProfile, error: updateError } = await supabase.from('profiles').update({ 
         status: 'Activo', 
         payment_id: `MP-TOKEN-${cardToken.id}`, 
         plan: currentPlan.name, 
         limit_msgs: currentPlan.limit, 
         updated_at: new Date().toISOString()
-      }).eq('id', userToUpdate.id);
+      }).eq('id', userToUpdate.id).select().single();
       
-      if (updateError) throw updateError;
+      if (updateError || !updatedProfile || updatedProfile.status !== 'Activo') {
+        throw new Error("No pudimos confirmar la activación de su cuenta en el servidor judicial.");
+      }
       
-      // Solo después de actualizar exitosamente la DB permitimos el ingreso
+      // Solo después de confirmar el estatus real, permitimos el ingreso
       onLogin(userToUpdate.email || '', 'user');
     } catch (err: any) { 
       alert("ERROR DE ACTIVACIÓN: " + (err.message || "Error en la pasarela de pago.")); 

@@ -23,27 +23,37 @@ function App() {
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Bypass solo si el rol admin está configurado explícitamente y verificado
       const savedRole = localStorage.getItem('gma_role');
       const savedUser = localStorage.getItem('gma_user');
+
+      // 1. Manejo de Admin (Bypass controlado)
       if (savedRole === 'admin' && savedUser === 'admin') {
         setUser('admin'); setRole('admin'); setView('admin'); return;
+      } else if (savedRole === 'admin') {
+        // Limpieza de seguridad si hay basura en localStorage
+        localStorage.removeItem('gma_role'); localStorage.removeItem('gma_user');
       }
 
+      // 2. Manejo de Usuarios Reales
       if (session?.user) {
-        // Validación obligatoria contra Base de Datos
+        // Validación CRÍTICA: Consultar estatus real en DB antes de permitir Dashboard
         const { data: profile, error } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
         if (!error && profile?.status === 'Activo') {
+          console.log("Acceso Autorizado: Perfil Activo.");
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          console.warn("Acceso Denegado: Su cuenta no está activa o el pago no ha sido validado.");
+          // Bloqueo total: Si no es activo, se queda en Login (Muro de Pago)
+          console.warn("Acceso Denegado: Cuenta Inactiva/Pendiente de Pago.");
           setUser(session.user.email || '');
           setRole('user');
           setView('login');
         }
+      } else {
+        // No hay sesión, vista de aterrizaje
+        setView('landing');
       }
     };
 
