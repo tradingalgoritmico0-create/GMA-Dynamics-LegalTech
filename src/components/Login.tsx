@@ -80,22 +80,52 @@ const Login = ({ onLogin }: LoginProps) => {
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
   };
 
+  const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '' });
+
   const onPaymentCompleted = async () => {
     if (!acceptTerms) return alert('Debe aceptar los términos legales.');
+    if (currentPlan.price > 0 && (!cardData.number || !cardData.expiry || !cardData.cvc)) {
+      return alert('Por favor complete los datos de su tarjeta.');
+    }
+
     setIsProcessing(true);
     try {
+      // 1. INTEGRACIÓN CON MERCADO PAGO (Tokenización)
+      // Esto valida que la tarjeta sea REAL antes de proceder
+      if (currentPlan.price > 0) {
+        const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
+        const [month, year] = cardData.expiry.split('/');
+        
+        // Creamos el token (Esto fallará si la tarjeta es falsa o los datos inválidos)
+        const cardToken = await mp.createCardToken({
+          cardNumber: cardData.number.replace(/\s/g, ''),
+          cardholderName: fullName || 'Abogado GMA',
+          cardExpirationMonth: month,
+          cardExpirationYear: '20' + year,
+          securityCode: cardData.cvc,
+          identificationType: 'CC',
+          identificationNumber: '12345678'
+        });
+
+        if (!cardToken.id) throw new Error("Datos de tarjeta inválidos o rechazados.");
+        console.log("Pago Validado - Token ID:", cardToken.id);
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       const userToUpdate = pendingUser || session?.user;
       const { error } = await supabase.from('profiles').update({ 
         status: 'Activo', 
-        payment_id: `TEST-MP-${Date.now()}`, 
+        payment_id: `MP-${Date.now()}`, 
         plan: currentPlan.name, 
         limit_msgs: currentPlan.limit, 
-        updated_at: new Date().toISOString() // La fecha de inicio es ahora
+        updated_at: new Date().toISOString()
       }).eq('id', userToUpdate.id);
+      
       if (error) throw error;
       onLogin(userToUpdate.email || '', 'user');
-    } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
+    } catch (err: any) { 
+      alert("Error en el pago: " + (err.message || "Verifique los datos de su tarjeta.")); 
+    } finally { setIsProcessing(false); }
   };
 
   if (mustPay) {

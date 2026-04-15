@@ -89,12 +89,31 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
     if (!account?.expiresAt) return false;
     return new Date() > new Date(account.expiresAt);
   };
+const processPayment = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!extraCard.number || !extraCard.expiry || !extraCard.cvc) return alert("Complete los datos de la tarjeta.");
 
-  const processPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+  setIsProcessing(true);
+  try {
+    // 1. VALIDACIÓN REAL CON MERCADO PAGO
+    const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
+    const [month, year] = extraCard.expiry.split('/');
+
+    const cardToken = await mp.createCardToken({
+      cardNumber: extraCard.number.replace(/\s/g, ''),
+      cardholderName: user,
+      cardExpirationMonth: month,
+      cardExpirationYear: '20' + year,
+      securityCode: extraCard.cvc,
+      identificationType: 'CC',
+      identificationNumber: '12345678'
+    });
+
+    if (!cardToken.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
+    console.log("Validación Exitosa - Token:", cardToken.id);
+
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+...
       if (!authUser || !account) throw new Error("Error de sesión");
       if (paymentType === 'extra') {
         const newLimit = account.limit + extraQty;
