@@ -22,11 +22,12 @@ function App() {
     // 1. Verificar sesión inicial
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
+      const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+      const userEmail = session?.user?.email?.trim().toLowerCase();
       
-      // A. BYPASS DE SUPER ADMIN (Prioridad Máxima y Segura por Email)
-      if (session?.user && superAdminEmail && session.user.email === superAdminEmail) {
-        console.log("🛡️ Super Admin detectado por Email.");
+      // A. BYPASS DE SUPER ADMIN (Robustez Total contra mayúsculas/espacios)
+      if (userEmail && superAdminEmail && userEmail === superAdminEmail) {
+        console.log("🛡️ Super Admin Identificado.");
         handleLogin('admin', 'admin');
         return;
       }
@@ -36,13 +37,11 @@ function App() {
         const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
         if (profile?.status === 'Activo') {
-          // Solo los usuarios con suscripción activa entran directo al Dashboard
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
           // Si la cuenta no está activa, lo mantenemos en la Landing por profesionalismo
-          // El usuario decidirá cuándo entrar al flujo de pago haciendo clic en Acceso
           setUser(session.user.email || '');
           setRole('user');
           setView('landing');

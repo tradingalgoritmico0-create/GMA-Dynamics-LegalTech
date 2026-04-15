@@ -87,7 +87,9 @@ const Login = ({ onLogin }: LoginProps) => {
 
   const handleBackToLogin = async () => {
     await supabase.auth.signOut();
-    window.location.reload();
+    setMustPay(false);
+    setPendingUser(null);
+    setIsRegistering(false);
   };
 
   const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '' });
