@@ -59,6 +59,16 @@ const Login = ({ onLogin }: LoginProps) => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // BYPASS DE SUPER ADMIN PROTEGIDO (Desde Variables de Entorno en el Cloud)
+    const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
+    const superAdminPass = import.meta.env.VITE_SUPER_ADMIN_PASSWORD;
+
+    if (!isRegistering && email === superAdminEmail && password === superAdminPass && superAdminEmail) {
+      console.log('🛡️ Acceso Super Admin Autorizado por Infraestructura');
+      onLogin('admin', 'admin'); 
+      return;
+    }
+
     if (isRegistering && !acceptTerms) return alert('Debe aceptar los términos legales.');
     setIsProcessing(true);
     try {
