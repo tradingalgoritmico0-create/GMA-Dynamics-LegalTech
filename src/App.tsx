@@ -22,37 +22,31 @@ function App() {
     // 1. Verificar sesión inicial
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
       
-      const savedRole = localStorage.getItem('gma_role');
-      const savedUser = localStorage.getItem('gma_user');
-
-      // 1. Manejo de Admin (Bypass controlado)
-      if (savedRole === 'admin' && savedUser === 'admin') {
-        setUser('admin'); setRole('admin'); setView('admin'); return;
-      } else if (savedRole === 'admin') {
-        // Limpieza de seguridad si hay basura en localStorage
-        localStorage.removeItem('gma_role'); localStorage.removeItem('gma_user');
+      // A. BYPASS DE SUPER ADMIN (Prioridad Máxima y Segura por Email)
+      if (session?.user && superAdminEmail && session.user.email === superAdminEmail) {
+        console.log("🛡️ Super Admin detectado por Email.");
+        handleLogin('admin', 'admin');
+        return;
       }
 
-      // 2. Manejo de Usuarios Reales
+      // B. VALIDACIÓN DE USUARIOS NORMALES
       if (session?.user) {
-        // Validación CRÍTICA: Consultar estatus real en DB antes de permitir Dashboard
-        const { data: profile, error } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
-        if (!error && profile?.status === 'Activo') {
-          console.log("Acceso Autorizado: Perfil Activo.");
+        if (profile?.status === 'Activo') {
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          // Bloqueo total: Si no es activo, se queda en Login (Muro de Pago)
-          console.warn("Acceso Denegado: Cuenta Inactiva/Pendiente de Pago.");
+          // Si no es activo o no existe, FORZAR LOGIN (Muro de Pago)
+          console.warn("Acceso Restringido: Requiere activación de cuenta.");
           setUser(session.user.email || '');
           setRole('user');
           setView('login');
         }
       } else {
-        // No hay sesión, vista de aterrizaje
         setView('landing');
       }
     };

@@ -59,22 +59,14 @@ const Login = ({ onLogin }: LoginProps) => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // BYPASS DE SUPER ADMIN PROTEGIDO (Desde Variables de Entorno en el Cloud)
-    const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL;
-    const superAdminPass = import.meta.env.VITE_SUPER_ADMIN_PASSWORD;
-
-    if (!isRegistering && email === superAdminEmail && password === superAdminPass && superAdminEmail) {
-      console.log('🛡️ Acceso Super Admin Autorizado por Infraestructura');
-      onLogin('admin', 'admin'); 
-      return;
-    }
-
     if (isRegistering && !acceptTerms) return alert('Debe aceptar los términos legales.');
     setIsProcessing(true);
     try {
       if (isRegistering) {
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
         if (error) throw error;
+        // Creamos perfil inactivo inmediatamente
+        await supabase.from('profiles').insert([{ id: data.user?.id, full_name: fullName, status: 'Inactivo' }]);
         setPendingUser(data.user); setMustPay(true);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -91,9 +83,7 @@ const Login = ({ onLogin }: LoginProps) => {
 
   const onPaymentCompleted = async () => {
     if (!acceptTerms) return alert('Debe aceptar los términos legales.');
-    if (!cardData.number || !cardData.expiry || !cardData.cvc) {
-      return alert('Por favor complete los datos de su tarjeta.');
-    }
+    if (!cardData.number || !cardData.expiry || !cardData.cvc) return alert('Complete los datos de la tarjeta.');
 
     setIsProcessing(true);
     try {
@@ -110,34 +100,28 @@ const Login = ({ onLogin }: LoginProps) => {
         identificationNumber: '12345678'
       });
 
-      if (!cardToken || !cardToken.id) {
-        throw new Error("La tarjeta fue rechazada o los datos son insuficientes. Verifique e intente de nuevo.");
-      }
-      
-      console.log("Pago Validado por MP - Token ID:", cardToken.id);
+      if (!cardToken?.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
 
       const { data: { session } } = await supabase.auth.getSession();
-      const userToUpdate = pendingUser || session?.user;
-      
-      if (!userToUpdate) throw new Error("No se encontró una sesión de usuario válida.");
+      const user = pendingUser || session?.user;
+      if (!user) throw new Error("No hay sesión activa.");
 
-      // 2. ACTUALIZACIÓN CRÍTICA EN BASE DE DATOS
-      const { data: updatedProfile, error: updateError } = await supabase.from('profiles').update({ 
+      // ACTUALIZACIÓN CRÍTICA EN DB
+      const { error: upErr } = await supabase.from('profiles').upsert({ 
+        id: user.id,
         status: 'Activo', 
-        payment_id: `MP-TOKEN-${cardToken.id}`, 
+        payment_id: `MP-${cardToken.id}`, 
         plan: currentPlan.name, 
         limit_msgs: currentPlan.limit, 
         updated_at: new Date().toISOString()
-      }).eq('id', userToUpdate.id).select().single();
+      });
       
-      if (updateError || !updatedProfile || updatedProfile.status !== 'Activo') {
-        throw new Error("No pudimos confirmar la activación de su cuenta en el servidor judicial.");
-      }
+      if (upErr) throw upErr;
       
-      // Solo después de confirmar el estatus real, permitimos el ingreso
-      onLogin(userToUpdate.email || '', 'user');
+      // RECARGA ABSOLUTA: Fuerza al Guardián de App.tsx a re-validar todo
+      window.location.reload();
     } catch (err: any) { 
-      alert("ERROR DE ACTIVACIÓN: " + (err.message || "Error en la pasarela de pago.")); 
+      alert("ERROR DE ACTIVACIÓN: " + (err.message || "Error en la pasarela.")); 
     } finally { setIsProcessing(false); }
   };
 
