@@ -84,32 +84,30 @@ const Login = ({ onLogin }: LoginProps) => {
 
   const onPaymentCompleted = async () => {
     if (!acceptTerms) return alert('Debe aceptar los términos legales.');
-    if (currentPlan.price > 0 && (!cardData.number || !cardData.expiry || !cardData.cvc)) {
+    if (!cardData.number || !cardData.expiry || !cardData.cvc) {
       return alert('Por favor complete los datos de su tarjeta.');
     }
 
     setIsProcessing(true);
     try {
       // 1. INTEGRACIÓN CON MERCADO PAGO (Tokenización)
-      // Esto valida que la tarjeta sea REAL antes de proceder
-      if (currentPlan.price > 0) {
-        const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
-        const [month, year] = cardData.expiry.split('/');
-        
-        // Creamos el token (Esto fallará si la tarjeta es falsa o los datos inválidos)
-        const cardToken = await mp.createCardToken({
-          cardNumber: cardData.number.replace(/\s/g, ''),
-          cardholderName: fullName || 'Abogado GMA',
-          cardExpirationMonth: month,
-          cardExpirationYear: '20' + year,
-          securityCode: cardData.cvc,
-          identificationType: 'CC',
-          identificationNumber: '12345678'
-        });
+      // Esto valida que la tarjeta sea REAL antes de proceder obligatoriamente
+      const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
+      const [month, year] = cardData.expiry.split('/');
+      
+      // Creamos el token (Esto fallará si la tarjeta es falsa o los datos inválidos)
+      const cardToken = await mp.createCardToken({
+        cardNumber: cardData.number.replace(/\s/g, ''),
+        cardholderName: fullName || 'Abogado GMA',
+        cardExpirationMonth: month,
+        cardExpirationYear: '20' + year,
+        securityCode: cardData.cvc,
+        identificationType: 'CC',
+        identificationNumber: '12345678'
+      });
 
-        if (!cardToken.id) throw new Error("Datos de tarjeta inválidos o rechazados.");
-        console.log("Pago Validado - Token ID:", cardToken.id);
-      }
+      if (!cardToken.id) throw new Error("Datos de tarjeta inválidos o rechazados.");
+      console.log("Pago Validado - Token ID:", cardToken.id);
 
       const { data: { session } } = await supabase.auth.getSession();
       const userToUpdate = pendingUser || session?.user;

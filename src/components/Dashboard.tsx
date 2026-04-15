@@ -172,7 +172,7 @@ const processPayment = async (e: React.FormEvent) => {
             <h1 style={{ color: 'white', fontSize: '1.4rem', margin: 0, fontWeight: 900 }}>GMA <span style={{ color: '#3b82f6' }}>DYNAMICS</span></h1>
             <span style={{ fontSize: '0.75rem', color: '#94a3b8', letterSpacing: '1px', fontWeight: 'bold' }}>TRAZABILIDAD JUDICIAL</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
             {account && (
               <div style={{ display: 'flex', gap: '2rem' }}>
                 <div style={{ textAlign: 'right' }}>
@@ -180,11 +180,14 @@ const processPayment = async (e: React.FormEvent) => {
                   <div style={{ fontSize: '0.9rem', fontWeight: '700' }}>{account.plan}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: '900', textTransform: 'uppercase' }}>Consumo</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#3b82f6' }}>{account.sent} / {account.limit}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: '900', textTransform: 'uppercase' }}>Vencimiento</div>
                   <div style={{ fontSize: '0.8rem', fontWeight: '700', color: '#f59e0b' }}>
                     {account.expiresAt ? new Date(account.expiresAt).toLocaleDateString() : 'N/A'}
                   </div>
-                  <div style={{ fontSize: '0.5rem', color: '#94a3b8', fontWeight: 'bold' }}>*Mensajes no acumulables</div>
                 </div>
               </div>
             )}
