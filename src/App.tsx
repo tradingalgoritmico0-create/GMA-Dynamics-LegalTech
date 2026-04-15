@@ -31,7 +31,7 @@ function App() {
         if (userEmail === superAdminEmail) {
           console.log("🔓 SUPER ADMIN DETECTADO.");
           setRole('admin');
-          setUser(userEmail);
+          setUser(userEmail || null);
           setView('admin');
           return;
         }
