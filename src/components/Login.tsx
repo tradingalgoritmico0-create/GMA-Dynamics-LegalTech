@@ -5,10 +5,10 @@ import { DottedBackground } from './ui/Backgrounds';
 import TermsOfService from './TermsOfService';
 
 interface LoginProps {
-  onLogin: (username: string, role: 'admin' | 'user') => void;
+  // onLogin eliminada para seguridad centralizada en App.tsx
 }
 
-const Login = ({ onLogin }: LoginProps) => {
+const Login = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [mustPay, setMustPay] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<'gratis' | 'medio' | 'pro'>('gratis');
