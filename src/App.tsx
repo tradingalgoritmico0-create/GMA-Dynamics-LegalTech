@@ -23,30 +23,23 @@ function App() {
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // Si hay una sesión de admin en localStorage, respetarla
+      // Bypass solo si el rol admin está configurado explícitamente y verificado
       const savedRole = localStorage.getItem('gma_role');
-      if (savedRole === 'admin') {
-        setUser(localStorage.getItem('gma_user'));
-        setRole('admin');
-        setView('admin');
-        return;
+      const savedUser = localStorage.getItem('gma_user');
+      if (savedRole === 'admin' && savedUser === 'admin') {
+        setUser('admin'); setRole('admin'); setView('admin'); return;
       }
 
       if (session?.user) {
-        // Verificar si el usuario ha pagado (status Activo)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('status')
-          .eq('id', session.user.id)
-          .single();
+        // Validación obligatoria contra Base de Datos
+        const { data: profile, error } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
-        if (profile?.status === 'Activo') {
+        if (!error && profile?.status === 'Activo') {
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          // REFUERZO DE SEGURIDAD: Si no es activo, forzar vista de pago
-          console.log("Acceso Denegado: Cuenta no activa. Dirigiendo a pasarela...");
+          console.warn("Acceso Denegado: Su cuenta no está activa o el pago no ha sido validado.");
           setUser(session.user.email || '');
           setRole('user');
           setView('login');

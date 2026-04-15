@@ -55,13 +55,6 @@ const Login = ({ onLogin }: LoginProps) => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // PRIORIDAD: Bypass de Super Admin
-    if (!isRegistering && email === 'admin' && password === 'GMA_Admin_2026!') {
-      console.log('Super Admin Bypass Activated');
-      onLogin('admin', 'admin'); 
-      return;
-    }
-
     if (isRegistering && !acceptTerms) return alert('Debe aceptar los términos legales.');
     setIsProcessing(true);
     try {
