@@ -147,7 +147,7 @@ const processPayment = async (e: React.FormEvent) => {
       Object.entries(formData).forEach(([k, v]) => v && n8nData.append(k, v));
       n8nData.set('file', encryptedFile); n8nData.append('hash', fileHash);
       await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
-      const { data: newNotif } = await supabase.from('notifications').insert([{ case_name: formData.caseName, phone: formData.phone, email: formData.email, defendant_id: formData.defendantId, file_hash: fileHash, owner_id: (await supabase.auth.getUser()).data.user?.id }]).select().single();
+      await supabase.from('notifications').insert([{ case_name: formData.caseName, phone: formData.phone, email: formData.email, defendant_id: formData.defendantId, file_hash: fileHash, owner_id: (await supabase.auth.getUser()).data.user?.id }]);
       
       // Incrementar contador de forma atómica y segura
       const { error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
@@ -158,10 +158,14 @@ const processPayment = async (e: React.FormEvent) => {
       if (updatedProfile) {
         // Refresco completo de dashboard tras éxito para sincronizar contador y notificaciones
         await loadDashboardData();
-        addLog("✅ Certificado judicial emitido.");
-        setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
-        } catch (error: any) { addLog("❌ FALLO: " + error.message); } finally { setIsProcessing(false); }
-        };
+      }
+      addLog("✅ Certificado judicial emitido.");
+      setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
+    } catch (error: any) { 
+      addLog("❌ FALLO: " + error.message); 
+    } finally { 
+      setIsProcessing(false); 
+    }
   };
 
   const addLog = (msg: string) => { setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 8)); };
