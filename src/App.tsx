@@ -87,18 +87,8 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = (username: string, userRole: 'admin' | 'user') => {
-    setUser(username);
-    setRole(userRole);
-    localStorage.setItem('gma_user', username);
-    localStorage.setItem('gma_role', userRole);
-    setView(userRole === 'admin' ? 'admin' : 'dashboard');
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('gma_user');
-    localStorage.removeItem('gma_role');
     setUser(null);
     setRole(null);
     setView('landing');
@@ -113,7 +103,7 @@ function App() {
   }
 
   if (view === 'login') {
-    return <Login onLogin={handleLogin} />;
+    return <Login />;
   }
 
   if (view === 'dashboard' && user) {
