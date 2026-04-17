@@ -35,7 +35,19 @@ const CertificateViewer = ({ data, onClose }: CertificateProps) => {
   return (
     <div ref={modalRef} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div className="cert-content" style={{ backgroundColor: 'white', width: '100%', maxWidth: '900px', height: '95vh', overflowY: 'auto', padding: '3rem', borderRadius: '2px', position: 'relative', fontFamily: '"Times New Roman", Times, serif', color: '#1a1a1a', boxShadow: '0 0 40px rgba(0,0,0,0.5)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', backgroundColor: '#f0f0f0', border: '1px solid #ccc', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cerrar Documento</button>
+        
+        {/* Marca de Agua */}
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '4rem', fontWeight: 'bold', color: 'rgba(0,0,0,0.05)',
+          transform: 'rotate(-45deg)', pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap'
+        }}>
+          GMA LEGALTECH - CERTIFICADO
+        </div>
+
+        <div style={{ position: 'relative', zIndex: 20 }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#f0f0f0', border: '1px solid #ccc', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cerrar</button>
+          <button onClick={() => window.print()} style={{ position: 'absolute', top: 0, right: '100px', backgroundColor: '#0f172a', color: 'white', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer' }}>Descargar</button>
         
         {/* Encabezado Oficial */}
         <div style={{ textAlign: 'center', marginBottom: '3rem', borderBottom: '3px double #000', paddingBottom: '1.5rem' }}>
