@@ -98,8 +98,7 @@ const Login = () => {
     try {
       const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
       const [month, year] = cardData.expiry.split('/');
-      
-      console.log("Iniciando Tokenización con Mercado Pago...");
+
       const cardToken = await mp.createCardToken({
         cardNumber: cardData.number.replace(/\s/g, ''),
         cardholderName: fullName || 'Abogado GMA',
@@ -111,44 +110,45 @@ const Login = () => {
       });
 
       if (cardToken?.error) {
-        console.error("Errores de Mercado Pago:", cardToken.error);
         const errorMsg = cardToken.error.cause?.[0]?.id;
         if (errorMsg === '205') throw new Error("Número de tarjeta inválido.");
         if (errorMsg === '208' || errorMsg === '209') throw new Error("Fecha de expiración inválida.");
         if (errorMsg === 'E301') throw new Error("Número de tarjeta incompleto.");
         if (errorMsg === 'E302' || errorMsg === '224') throw new Error("Código de seguridad (CVV) inválido.");
-        throw new Error("La entidad bancaria rechazó la validación. Verifique sus datos.");
+        throw new Error("Datos de tarjeta rechazados por el formato. Verifique sus datos.");
       }
-
-      if (!cardToken?.id) {
-        throw new Error("No se pudo generar el certificado de pago. Intente con otra tarjeta.");
-      }
+      if (!cardToken?.id) throw new Error("No se pudo generar el token. Intente con otra tarjeta.");
 
       const { data: { session } } = await supabase.auth.getSession();
       const user = pendingUser || session?.user;
-      if (!user) throw new Error("Sesión no encontrada. Reintente el inicio de sesión.");
+      if (!user || !session) throw new Error("Sesión no encontrada. Reintente el inicio de sesión.");
 
-      // ACTUALIZACIÓN CRÍTICA EN DB
-      const { error: upErr } = await supabase.from('profiles').upsert({ 
-        id: user.id,
-        status: 'Activo', 
-        payment_id: `MP-${cardToken.id}`, 
-        plan: currentPlan.name, 
-        limit_msgs: currentPlan.limit, 
-        updated_at: new Date().toISOString(),
-        full_name: fullName || 'Abogado GMA'
+      // Edge Function process-payment valida la tarjeta con el banco emisor:
+      //  - Plan gratis  → capture=false ($1.000 reservados y cancelados al instante, NO cobra)
+      //  - Plan medio/pro → cobro real con captura
+      const { data, error } = await supabase.functions.invoke('process-payment', {
+        body: {
+          token:        cardToken.id,
+          amount:       currentPlan.price > 0 ? currentPlan.price : 1000,
+          description:  `${currentPlan.name} — GMA Dynamics`,
+          user_id:      user.id,
+          payment_type: 'upgrade',
+          plan_id:      selectedPlanId,
+        },
       });
-      
-      if (upErr) {
-        console.error("Fallo crítico en Supabase:", upErr);
-        throw new Error(`Base de Datos rechazo activación: ${upErr.message}`);
+
+      if (error || !data?.success) {
+        throw new Error(data?.error ?? error?.message ?? 'La entidad bancaria rechazó la tarjeta.');
       }
-      
-      console.log("✅ Sistema Activo.");
+
+      await supabase.from('profiles').update({
+        full_name: fullName || 'Abogado GMA',
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
+
       window.location.reload();
-    } catch (err: any) { 
-      console.error("Error completo de pasarela:", err);
-      alert("FALLO CRÍTICO: " + (err.message || "Error en la pasarela de pago.")); 
+    } catch (err: any) {
+      alert("FALLO: " + (err.message || "Error en la pasarela de pago."));
     } finally { setIsProcessing(false); }
   };
 

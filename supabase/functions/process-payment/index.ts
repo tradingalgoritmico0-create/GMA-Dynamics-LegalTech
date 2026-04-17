@@ -25,9 +25,14 @@ interface MercadoPagoResponse {
 }
 
 const PLAN_DEFINITIONS: Record<string, { name: string; limit: number }> = {
-  medio: { name: "Plan Medio Judicial", limit: 20 },
-  pro:   { name: "Plan Pro Judicial",   limit: 100 },
+  gratis: { name: "Plan Inicial (5 Msgs)", limit: 5 },
+  medio:  { name: "Plan Medio Judicial",   limit: 20 },
+  pro:    { name: "Plan Pro Judicial",     limit: 100 },
 };
+
+// Monto mínimo permitido por MercadoPago Colombia para validar tarjeta con capture=false.
+// La reserva se cancela inmediatamente tras la autorización — NO se cobra al usuario.
+const VERIFY_AMOUNT_COP = 1000;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
@@ -113,11 +118,17 @@ Deno.serve(async (req: Request) => {
     const projectUrl = SUPABASE_URL.replace(".supabase.co", "").replace("https://", "");
     const webhookUrl = `https://${projectUrl}.supabase.co/functions/v1/mp-webhook`;
 
-    const mpPayload = {
-      transaction_amount: amount,
+    // Plan gratis → autorización de $1.000 COP (capture=false) que se cancela inmediatamente
+    // para confirmar que la tarjeta es real sin cobrar al usuario.
+    const isFreePlan = payment_type === "upgrade" && plan_id === "gratis";
+    const effectiveAmount = isFreePlan ? VERIFY_AMOUNT_COP : amount;
+
+    const mpPayload: Record<string, unknown> = {
+      transaction_amount: effectiveAmount,
       token,
-      description,
+      description: isFreePlan ? "Validación de tarjeta — GMA Dynamics" : description,
       installments: 1,
+      capture: !isFreePlan,
       payer: { email: jwtUser.email ?? "no-email@gma.co" },
       notification_url: webhookUrl,
       metadata: {
@@ -125,6 +136,7 @@ Deno.serve(async (req: Request) => {
         gma_payment_type: payment_type,
         gma_plan_id:      plan_id ?? null,
         gma_qty:          qty ?? null,
+        gma_is_verify:    isFreePlan,
       },
     };
 
@@ -149,18 +161,41 @@ Deno.serve(async (req: Request) => {
       }, 402);
     }
 
-    console.log(`[MP] payment_id=${mpData.id} status=${mpData.status} detail=${mpData.status_detail}`);
+    console.log(`[MP] payment_id=${mpData.id} status=${mpData.status} detail=${mpData.status_detail} verify=${isFreePlan}`);
 
-    // ── 5. Solo actualizar profiles si el pago está APROBADO ──────────────
-    // Para pagos 'pending' o 'in_process', el webhook mp-webhook completará la actualización
-    if (mpData.status !== "approved") {
+    // ── 5. Validar estado según tipo de flujo ─────────────────────────────
+    // Plan gratis: exige status="authorized" (capture=false valida con el banco sin cobrar)
+    // Resto:      exige status="approved" (cobro real efectivo)
+    const requiredStatus = isFreePlan ? "authorized" : "approved";
+    if (mpData.status !== requiredStatus) {
       return jsonResponse({
         success:    false,
         payment_id: String(mpData.id),
         status:     mpData.status,
         detail:     mpData.status_detail,
-        error:      `Pago no aprobado: ${mpData.status_detail}. Estado: ${mpData.status}`,
+        error:      `Tarjeta no ${isFreePlan ? "validada" : "aprobada"}: ${mpData.status_detail}. Estado: ${mpData.status}`,
       }, 402);
+    }
+
+    // Si es plan gratis, cancelar la autorización de inmediato para liberar la retención
+    // al titular. La validación ya fue exitosa con el banco emisor.
+    if (isFreePlan) {
+      const cancelResp = await fetch(`https://api.mercadopago.com/v1/payments/${mpData.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (!cancelResp.ok) {
+        // Log pero NO fallar: la validación ya fue exitosa. MP libera la reserva en 7 días
+        // aunque falle el cancel explícito.
+        const cancelErr = await cancelResp.text();
+        console.error(`[MP CANCEL] No se pudo cancelar auth payment_id=${mpData.id}:`, cancelErr);
+      } else {
+        console.log(`[MP CANCEL] auth payment_id=${mpData.id} liberada correctamente`);
+      }
     }
 
     // Cliente admin con service_role para bypass de RLS
