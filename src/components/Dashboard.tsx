@@ -46,6 +46,9 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
   const [extraQty, setExtraQty] = useState(1);
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<any>(null);
   const [extraCard, setExtraCard] = useState({ number: '', expiry: '', cvc: '' });
+  type PaymentStatus = 'idle' | 'processing' | 'success' | 'error';
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
+  const [paymentErrorMsg, setPaymentErrorMsg] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -93,9 +96,11 @@ const processPayment = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!extraCard.number || !extraCard.expiry || !extraCard.cvc) return alert("Complete los datos de la tarjeta.");
 
+  setPaymentStatus('processing');
+  setPaymentErrorMsg('');
   setIsProcessing(true);
   try {
-    // 1. VALIDACIÓN REAL CON MERCADO PAGO
+    // 1. Tokenizar tarjeta en frontend (SDK oficial de MP — correcto)
     const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
     const [month, year] = extraCard.expiry.split('/');
 
@@ -110,22 +115,43 @@ const processPayment = async (e: React.FormEvent) => {
     });
 
     if (!cardToken.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
-    console.log("Validación Exitosa - Token:", cardToken.id);
 
     const { data: { user: authUser } } = await supabase.auth.getUser();
+
     if (!authUser || !account) throw new Error("Error de sesión");
-    if (paymentType === 'extra') {
-      const newLimit = account.limit + extraQty;
-      await supabase.from('profiles').update({ limit_msgs: newLimit }).eq('id', authUser.id);
-      setAccount({ ...account, limit: newLimit });
-    } else {
-      const newExpires = new Date(); newExpires.setDate(newExpires.getDate() + 30);
-      await supabase.from('profiles').update({ plan: selectedUpgradePlan.name, limit_msgs: selectedUpgradePlan.limit, sent_msgs: 0, status: 'Activo', updated_at: new Date().toISOString() }).eq('id', authUser.id);
-      setAccount({ ...account, plan: selectedUpgradePlan.name, limit: selectedUpgradePlan.limit, sent: 0, expiresAt: newExpires.toISOString() });
+
+    const amount = paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price;
+    const description = paymentType === 'extra'
+      ? `Paquete ${extraQty} mensajes extra — GMA Dynamics`
+      : `${selectedUpgradePlan?.name} — GMA Dynamics`;
+
+    // 2. Llamar a la Edge Function — el servidor valida con MP y escribe en DB
+    const { data, error } = await supabase.functions.invoke('process-payment', {
+      body: {
+        token:        cardToken.id,
+        amount,
+        description,
+        user_id:      authUser.id,
+        payment_type: paymentType,
+        qty:          paymentType === 'extra' ? extraQty : undefined,
+        plan_id:      paymentType === 'upgrade' ? selectedUpgradePlan?.id : undefined,
+      },
+    });
+
+    if (error || !data?.success) {
+      throw new Error(data?.error ?? error?.message ?? 'Error en el servidor de pagos');
     }
-    setShowPaymentModal(false);
-    alert("Transacción exitosa.");
-  } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
+
+    // 3. Sincronizar estado desde Supabase (la fuente de verdad ya fue actualizada por la Edge Function)
+    await loadDashboardData();
+    setPaymentStatus('success');
+    setExtraCard({ number: '', expiry: '', cvc: '' });
+  } catch (err: any) {
+    setPaymentStatus('error');
+    setPaymentErrorMsg(err.message);
+  } finally {
+    setIsProcessing(false);
+  }
 };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -149,16 +175,22 @@ const processPayment = async (e: React.FormEvent) => {
       await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
       await supabase.from('notifications').insert([{ case_name: formData.caseName, phone: formData.phone, email: formData.email, defendant_id: formData.defendantId, file_hash: fileHash, owner_id: (await supabase.auth.getUser()).data.user?.id }]);
       
-      // Incrementar contador de forma atómica y segura
-      const { error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
+      // Incrementar contador de forma atómica — UPDATE...RETURNING sin bloqueos FOR UPDATE
+      // authUser ya fue obtenido al inicio del bloque, no volver a llamar getUser()
+      const { data: rpcData, error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
       if (rpcError) throw new Error("Error al incrementar contador: " + rpcError.message);
-      
-      // Refresco forzado desde la fuente de verdad (Supabase)
-      const { data: updatedProfile } = await supabase.from('profiles').select('*').eq('id', (await supabase.auth.getUser()).data.user?.id).single();
-      if (updatedProfile) {
-        // Refresco completo de dashboard tras éxito para sincronizar contador y notificaciones
-        await loadDashboardData();
+
+      // can_send = false significa que se alcanzó el límite en este envío
+      if (rpcData && rpcData.length > 0) {
+        if (!rpcData[0].can_send && rpcData[0].new_sent_msgs === rpcData[0].new_limit_msgs) {
+          addLog("⚠️ Límite de mensajes alcanzado.");
+        }
+        // Actualizar estado local inmediatamente — elimina el bug de F5
+        setAccount(prev => prev ? { ...prev, sent: rpcData[0].new_sent_msgs, limit: rpcData[0].new_limit_msgs } : null);
       }
+
+      // Sincronizar notificaciones desde Supabase (el contador ya está actualizado en el estado local)
+      await loadDashboardData();
       addLog("✅ Certificado judicial emitido.");
       setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
     } catch (error: any) { 
@@ -313,19 +345,51 @@ const processPayment = async (e: React.FormEvent) => {
         {showPaymentModal && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '32px', maxWidth: '480px', width: '90%' }}>
-              <div style={{ textAlign: 'center', marginBottom: '2rem' }}><h2 style={{ fontSize: '1.6rem', fontWeight: 900 }}>Confirmar Pago</h2><p style={{ color: '#64748b' }}>{paymentType === 'extra' ? `Paquete de ${extraQty} mensajes` : `Upgrade a ${selectedUpgradePlan?.name}`}</p></div>
-              <div style={{ backgroundColor: '#f8fafc', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><span style={{ fontWeight: 700 }}>Total</span><span style={{ fontWeight: 900, fontSize: '1.3rem' }}>${(paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price).toLocaleString()}</span></div>
-                <form onSubmit={processPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
-                  <input type="text" placeholder="Tarjeta" value={extraCard.number} onChange={e => setExtraCard({...extraCard, number: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    <input type="text" placeholder="MM/YY" value={extraCard.expiry} onChange={e => setExtraCard({...extraCard, expiry: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                    <input type="text" placeholder="CVC" value={extraCard.cvc} onChange={e => setExtraCard({...extraCard, cvc: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                  </div>
-                  <button type="submit" disabled={isProcessing} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900 }}>PAGAR AHORA</button>
-                </form>
-              </div>
-              <button onClick={() => setShowPaymentModal(false)} style={{ width: '100%', background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, cursor: 'pointer' }}>CANCELAR</button>
+              <AnimatePresence mode="wait">
+                {paymentStatus === 'processing' && (
+                  <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ width: 56, height: 56, border: '4px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', margin: '0 auto 1.5rem' }} />
+                    <p style={{ fontWeight: 700, color: '#0f172a' }}>Procesando pago...</p>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem' }}>No cierre esta ventana.</p>
+                  </motion.div>
+                )}
+
+                {paymentStatus === 'success' && (
+                  <motion.div key="success" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <div style={{ width: 56, height: 56, backgroundColor: '#d1fae5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.5rem' }}>✓</div>
+                    <h3 style={{ fontWeight: 900, color: '#065f46', marginBottom: '0.5rem' }}>¡Pago exitoso!</h3>
+                    <p style={{ color: '#64748b' }}>Tu plan ha sido actualizado correctamente.</p>
+                    <button onClick={() => { setShowPaymentModal(false); setPaymentStatus('idle'); }} style={{ marginTop: '1.5rem', padding: '0.8rem 2rem', borderRadius: '12px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer' }}>CONTINUAR</button>
+                  </motion.div>
+                )}
+
+                {paymentStatus === 'error' && (
+                  <motion.div key="error" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} style={{ textAlign: 'center', padding: '2rem 0' }}>
+                    <div style={{ width: 56, height: 56, backgroundColor: '#fef2f2', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.5rem' }}>✕</div>
+                    <h3 style={{ fontWeight: 900, color: '#991b1b', marginBottom: '0.5rem' }}>Pago rechazado</h3>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '1.5rem' }}>{paymentErrorMsg}</p>
+                    <button onClick={() => setPaymentStatus('idle')} style={{ padding: '0.8rem 2rem', borderRadius: '12px', backgroundColor: '#3b82f6', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer' }}>INTENTAR DE NUEVO</button>
+                  </motion.div>
+                )}
+
+                {paymentStatus === 'idle' && (
+                  <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}><h2 style={{ fontSize: '1.6rem', fontWeight: 900 }}>Confirmar Pago</h2><p style={{ color: '#64748b' }}>{paymentType === 'extra' ? `Paquete de ${extraQty} mensajes` : `Upgrade a ${selectedUpgradePlan?.name}`}</p></div>
+                    <div style={{ backgroundColor: '#f8fafc', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><span style={{ fontWeight: 700 }}>Total</span><span style={{ fontWeight: 900, fontSize: '1.3rem' }}>${(paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price).toLocaleString()}</span></div>
+                      <form onSubmit={processPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
+                        <input type="text" placeholder="Tarjeta" value={extraCard.number} onChange={e => setExtraCard({...extraCard, number: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <input type="text" placeholder="MM/YY" value={extraCard.expiry} onChange={e => setExtraCard({...extraCard, expiry: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                          <input type="text" placeholder="CVC" value={extraCard.cvc} onChange={e => setExtraCard({...extraCard, cvc: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
+                        </div>
+                        <button type="submit" disabled={isProcessing} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer' }}>PAGAR AHORA</button>
+                      </form>
+                    </div>
+                    <button onClick={() => setShowPaymentModal(false)} style={{ width: '100%', background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, cursor: 'pointer' }}>CANCELAR</button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </div>
         )}
