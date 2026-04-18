@@ -57,23 +57,6 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [paymentErrorMsg, setPaymentErrorMsg] = useState('');
 
-  const openWompiWidget = (amount: number, reference: string) => {
-    const checkout = new (window as any).WidgetCheckout({
-      currency: 'COP',
-      amountInCents: amount * 100,
-      reference: reference,
-      publicKey: import.meta.env.VITE_WOMPI_PUBLIC_KEY,
-    });
-
-    checkout.open(async (result: any) => {
-      if (result.transaction.status === 'APPROVED') {
-        alert("Pago aprobado.");
-        await loadDashboardData();
-        setShowPaymentModal(false);
-      }
-    });
-  };
-
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isPlanActive = () => {
