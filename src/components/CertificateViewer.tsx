@@ -48,6 +48,7 @@ const CertificateViewer = ({ data, onClose }: CertificateProps) => {
         <div style={{ position: 'relative', zIndex: 20 }}>
           <button onClick={onClose} style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#f0f0f0', border: '1px solid #ccc', padding: '0.5rem 1rem', cursor: 'pointer' }}>Cerrar</button>
           <button onClick={() => window.print()} style={{ position: 'absolute', top: 0, right: '100px', backgroundColor: '#0f172a', color: 'white', border: 'none', padding: '0.5rem 1rem', cursor: 'pointer' }}>Descargar</button>
+        </div>
         
         {/* Encabezado Oficial */}
         <div style={{ textAlign: 'center', marginBottom: '3rem', borderBottom: '3px double #000', paddingBottom: '1.5rem' }}>
