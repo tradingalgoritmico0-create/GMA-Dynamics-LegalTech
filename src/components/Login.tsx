@@ -25,36 +25,15 @@ const Login = () => {
 
   const currentPlan = plans.find(p => p.id === selectedPlanId)!;
 
+  // Flujo simplificado: No se requiere validación de pago al inicio
   useEffect(() => {
-    const checkPaymentStatus = async () => {
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        setIsProcessing(true);
-        try {
-          // A. VERIFICACIÓN DE ADMIN (Para evitar paywall en admin)
-          const { data: isAdmin } = await supabase.rpc('is_admin');
-          if (isAdmin) {
-             console.log("🔓 Acceso administrativo detectado, saltando paywall.");
-             return;
-          }
-
-          const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-          
-          if (error || !profile || profile.status !== 'Activo') {
-            // Si el perfil no existe o no es Activo, forzamos Muro de Pago
-            console.warn("Sesión detectada pero cuenta Inactiva. Requiere activación.");
-            setPendingUser(session.user);
-            setMustPay(true);
-          } else {
-            console.log("Sesión activa y perfil validado.");
-          }
-        } catch (err) { 
-          console.error("Error validando estatus:", err);
-          setMustPay(true); 
-        } finally { setIsProcessing(false); }
+        console.log("Sesión activa.");
       }
     };
-    checkPaymentStatus();
+    checkSession();
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -66,9 +45,8 @@ const Login = () => {
       if (isRegistering) {
         const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
         if (error) throw error;
-        // Creamos perfil inactivo inmediatamente
-        await supabase.from('profiles').insert([{ id: data.user?.id, full_name: fullName, status: 'Inactivo' }]);
-        setPendingUser(data.user); setMustPay(true);
+        // Creamos perfil activo automáticamente (Plan Gratis)
+        await supabase.from('profiles').insert([{ id: data.user?.id, full_name: fullName, status: 'Activo', plan: 'Plan Gratis Judicial' }]);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
