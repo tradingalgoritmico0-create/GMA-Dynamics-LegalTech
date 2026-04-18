@@ -34,7 +34,13 @@ interface UserAccount {
 }
 
 const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) => {
-  const [formData, setFormData] = useState({ caseName: '', phone: '', email: 'no-email@gma.com', defendantId: '', file: null as File | null });
+  const [formData, setFormData] = useState({ 
+    caseName: '', 
+    phone: '', 
+    email: user || '', 
+    defendantId: '', 
+    file: null as File | null 
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Notification | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
@@ -45,10 +51,28 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
   const [paymentType, setPaymentType] = useState<'extra' | 'upgrade'>('extra');
   const [extraQty, setExtraQty] = useState(1);
   const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<any>(null);
+  
+  // ESTADOS DE PAGO (CORRECCIÓN DE FALLO DE REFERENCIA)
   const [extraCard, setExtraCard] = useState({ number: '', expiry: '', cvc: '' });
-  type PaymentStatus = 'idle' | 'processing' | 'success' | 'error';
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [paymentErrorMsg, setPaymentErrorMsg] = useState('');
+
+  const openWompiWidget = (amount: number, reference: string) => {
+    const checkout = new (window as any).WidgetCheckout({
+      currency: 'COP',
+      amountInCents: amount * 100,
+      reference: reference,
+      publicKey: import.meta.env.VITE_WOMPI_PUBLIC_KEY,
+    });
+
+    checkout.open(async (result: any) => {
+      if (result.transaction.status === 'APPROVED') {
+        alert("Pago aprobado.");
+        await loadDashboardData();
+        setShowPaymentModal(false);
+      }
+    });
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -111,7 +135,7 @@ const processPayment = async (e: React.FormEvent) => {
       cardExpirationYear: '20' + year,
       securityCode: extraCard.cvc,
       identificationType: 'CC',
-      identificationNumber: '12345678'
+      identificationNumber: formData.defendantId || '12345678' // Fallback a defendantId para consistencia de datos
     });
 
     if (!cardToken.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
@@ -157,12 +181,41 @@ const processPayment = async (e: React.FormEvent) => {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.file || !account || account.sent >= account.limit) return;
+    
+    // Lógica de Cooldown para Plan Gratis
+    if (account.plan.toLowerCase().includes('gratis')) {
+      const { data: lastMsg } = await supabase
+        .from('bitacora_mensajes')
+        .select('created_at')
+        .eq('owner_id', (await supabase.auth.getUser()).data.user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (lastMsg && lastMsg.length > 0) {
+        const lastSendTime = new Date(lastMsg[0].created_at).getTime();
+        const now = new Date().getTime();
+        if ((now - lastSendTime) < (30 * 60 * 1000)) {
+          alert("Debes esperar 30 minutos entre notificaciones en el Plan Gratis.");
+          return;
+        }
+      }
+    }
+
     setIsProcessing(true); setLogs([]);
     addLog("🛡️ Protocolo LegalTech v2.9...");
     try {
       addLog("🔐 Cifrando documento...");
       const pdfBytes = new Uint8Array(await formData.file.arrayBuffer());
-      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { ownerPassword: 'GMA_ADMIN_MASTER_2026', allowModifying: false, allowCopying: false });
+      
+      // LA SEGURIDAD ES PRIMERO: Se usa variable de entorno para la contraseña maestra.
+      // Se recomienda mover esta lógica a una Edge Function para máxima protección.
+      const ownerPassword = import.meta.env.VITE_PDF_OWNER_PASSWORD || 'GMA_DEFAULT_OWNER_2026';
+      
+      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { 
+        ownerPassword, 
+        allowModifying: false, 
+        allowCopying: false 
+      });
       const encryptedFile = new File([encryptedBytes], `Protegido_${formData.file.name}`, { type: 'application/pdf' });
       addLog("🧬 Generando Hash SHA-256...");
       const arrayBuffer = await encryptedFile.arrayBuffer();
@@ -374,19 +427,54 @@ const processPayment = async (e: React.FormEvent) => {
 
                 {paymentStatus === 'idle' && (
                   <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}><h2 style={{ fontSize: '1.6rem', fontWeight: 900 }}>Confirmar Pago</h2><p style={{ color: '#64748b' }}>{paymentType === 'extra' ? `Paquete de ${extraQty} mensajes` : `Upgrade a ${selectedUpgradePlan?.name}`}</p></div>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}><span style={{ fontWeight: 700 }}>Total</span><span style={{ fontWeight: 900, fontSize: '1.3rem' }}>${(paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price).toLocaleString()}</span></div>
-                      <form onSubmit={processPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
-                        <input type="text" placeholder="Tarjeta" value={extraCard.number} onChange={e => setExtraCard({...extraCard, number: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                          <input type="text" placeholder="MM/YY" value={extraCard.expiry} onChange={e => setExtraCard({...extraCard, expiry: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                          <input type="text" placeholder="CVC" value={extraCard.cvc} onChange={e => setExtraCard({...extraCard, cvc: e.target.value})} style={{ width: '100%', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required />
-                        </div>
-                        <button type="submit" disabled={isProcessing} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer' }}>PAGAR AHORA</button>
-                      </form>
+                    <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                      <h2 style={{ fontSize: '1.6rem', fontWeight: 900 }}>Confirmar Pago</h2>
+                      <p style={{ color: '#64748b' }}>{paymentType === 'extra' ? `Paquete de ${extraQty} mensajes` : `Upgrade a ${selectedUpgradePlan?.name}`}</p>
                     </div>
-                    <button onClick={() => setShowPaymentModal(false)} style={{ width: '100%', background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, cursor: 'pointer' }}>CANCELAR</button>
+                    
+                    <form onSubmit={processPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                      <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                          <span style={{ fontWeight: 700, color: '#475569' }}>Total a pagar</span>
+                          <span style={{ fontWeight: 900, fontSize: '1.4rem', color: '#0f172a' }}>
+                            ${(paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                          <input 
+                            type="text" placeholder="0000 0000 0000 0000" 
+                            value={extraCard.number} 
+                            onChange={e => setExtraCard({...extraCard, number: e.target.value})}
+                            style={{ padding: '0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required 
+                          />
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                            <input 
+                              type="text" placeholder="MM/YY" 
+                              value={extraCard.expiry} 
+                              onChange={e => setExtraCard({...extraCard, expiry: e.target.value})}
+                              style={{ padding: '0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required 
+                            />
+                            <input 
+                              type="text" placeholder="CVC" 
+                              value={extraCard.cvc} 
+                              onChange={e => setExtraCard({...extraCard, cvc: e.target.value})}
+                              style={{ padding: '0.9rem', borderRadius: '12px', border: '1px solid #cbd5e1' }} required 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        type="submit"
+                        disabled={isProcessing}
+                        style={{ width: '100%', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#0f172a', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer', boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.2)' }}
+                      >
+                        {isProcessing ? 'PROCESANDO...' : 'PAGAR AHORA CON MERCADO PAGO'}
+                      </button>
+                    </form>
+                    
+                    <button onClick={() => setShowPaymentModal(false)} style={{ width: '100%', background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', marginTop: '1.5rem' }}>CANCELAR</button>
                   </motion.div>
                 )}
               </AnimatePresence>

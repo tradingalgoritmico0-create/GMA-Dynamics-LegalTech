@@ -27,12 +27,17 @@ const Login = () => {
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      if (localStorage.getItem('gma_role') === 'admin' && localStorage.getItem('gma_user') === 'admin') return;
-      
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setIsProcessing(true);
         try {
+          // A. VERIFICACIÓN DE ADMIN (Para evitar paywall en admin)
+          const { data: isAdmin } = await supabase.rpc('is_admin');
+          if (isAdmin) {
+             console.log("🔓 Acceso administrativo detectado, saltando paywall.");
+             return;
+          }
+
           const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
           
           if (error || !profile || profile.status !== 'Activo') {
@@ -256,7 +261,7 @@ const Login = () => {
                 <motion.input initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} type="text" placeholder="Nombre Completo o Firma" value={fullName} onChange={e => setFullName(e.target.value)} style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '1.1rem' }} required />
               )}
             </AnimatePresence>
-            <input type="text" placeholder="Email Profesional" value={email} onChange={e => setEmail(e.target.value)} style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '1.1rem' }} required={email !== 'admin'} />
+            <input type="text" placeholder="Email Profesional" value={email} onChange={e => setEmail(e.target.value)} style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '1.1rem' }} required />
             <input type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '1.1rem' }} required />
             
             {isRegistering && (

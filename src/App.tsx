@@ -8,32 +8,48 @@ import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import PublicValidator from './components/PublicValidator'
 import AdminDashboard from './components/AdminDashboard'
+import PublicView from './components/PublicView'
 import TermsOfService from './components/TermsOfService'
 import { supabase } from './lib/supabaseClient'
 
 function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin'>('landing');
+  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view'>('landing');
   const [user, setUser] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [verifyData, setVerifyData] = useState<{hash: string, caseName: string} | null>(null);
   const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
-    // 1. Verificar sesión inicial
+    // A. Detección de ruta pública para visor de demandas
+    const checkPath = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/view/')) {
+        setView('public_view');
+      }
+    };
+    checkPath();
+    window.addEventListener('popstate', checkPath);
+
+    // B. Verificar sesión inicial
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'Admin2577@gma.co').trim().toLowerCase();
 
       if (session?.user) {
         const userEmail = session.user.email?.trim().toLowerCase();
 
-        // A. ACCESO MAESTRO (Independiente de la base de datos)
-        if (userEmail === superAdminEmail) {
-          console.log("🔓 SUPER ADMIN DETECTADO.");
-          setRole('admin');
-          setUser(userEmail || null);
-          setView('admin');
-          return;
+        // A. VERIFICACIÓN DE ADMINISTRADOR (Validación en Servidor via RPC)
+        try {
+          const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
+          
+          if (!adminError && isAdmin) {
+            console.log("🔓 ACCESO ADMINISTRATIVO VALIDADO.");
+            setRole('admin');
+            setUser(userEmail || null);
+            setView('admin');
+            return;
+          }
+        } catch (err) {
+          console.error("Error verificando rol administrativo:", err);
         }
 
         // B. USUARIOS NORMALES
@@ -100,6 +116,10 @@ function App() {
 
   if (view === 'admin' && role === 'admin') {
     return <AdminDashboard onLogout={handleLogout} />;
+  }
+
+  if (view === 'public_view') {
+    return <PublicView />;
   }
 
   if (view === 'login') {
