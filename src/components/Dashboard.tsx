@@ -280,53 +280,18 @@ const processPayment = async (e: React.FormEvent) => {
         <div style={{ display: 'grid', gridTemplateColumns: '450px 1fr', gap: '3rem', alignItems: 'start' }}>
           
           <div className="dash-card" style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '28px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
-            {account && (account.sent >= account.limit || isPlanExpired()) ? (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-                  <div style={{ width: '50px', height: '50px', backgroundColor: '#fef2f2', color: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', fontSize: '1.2rem' }}>⚠️</div>
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{isPlanExpired() ? 'Plan Expirado' : 'Límite Alcanzado'}</h3>
-                  <p style={{ color: '#64748b', fontSize: '0.9rem' }}>{isPlanExpired() ? 'Su periodo de servicio ha finalizado.' : 'Optimice su inversión con nuestros planes mensuales y ahorre hasta un 75%.'}</p>
+            {/* SECCIÓN DE GESTIÓN DE CAPACIDAD (Siempre visible) */}
+            <div className="dash-card" style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '28px', border: '1px solid #e2e8f0', marginTop: '2rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '1.5rem' }}>🚀 Gestionar Capacidad</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <button onClick={() => { setPaymentType('extra'); setShowPaymentModal(true); }} style={{ padding: '1rem', borderRadius: '16px', border: '1px solid #3b82f6', backgroundColor: '#eff6ff', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 900, color: '#1e3a8a' }}>Comprar Mensajes</div>
+                  </button>
+                  <button onClick={() => { setPaymentType('upgrade'); setShowPaymentModal(true); }} style={{ padding: '1rem', borderRadius: '16px', border: '1px solid #10b981', backgroundColor: '#f0fdf4', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: 900, color: '#065f46' }}>Mejorar Plan</div>
+                  </button>
                 </div>
-
-                <div style={{ marginBottom: '2.5rem' }}>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 900, display: 'block', marginBottom: '1rem', textTransform: 'uppercase' }}>Recarga Inmediata (Extra)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-                    {[1, 5, 10, 20].map(q => (
-                      <button key={q} onClick={() => { setExtraQty(q); setPaymentType('extra'); setShowPaymentModal(true); }} style={{ padding: '1rem', borderRadius: '16px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', cursor: 'pointer', textAlign: 'left' }}>
-                        <div style={{ fontWeight: 900 }}>{q} Mensaje{q > 1 ? 's' : ''}</div>
-                        <div style={{ color: '#3b82f6', fontWeight: 800, fontSize: '0.8rem' }}>${getExtraPrice(q).toLocaleString()} COP</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 900, display: 'block', marginBottom: '1.2rem', textTransform: 'uppercase' }}>Actualizar a Plan Profesional</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                    {upgradePlans.map(p => (
-                      <button key={p.id} onClick={() => { setSelectedUpgradePlan(p); setPaymentType('upgrade'); setShowPaymentModal(true); }} style={{ padding: '1.8rem', borderRadius: '24px', border: '2px solid #3b82f6', backgroundColor: '#eff6ff', textAlign: 'left', cursor: 'pointer', position: 'relative' }}>
-                        <span style={{ position: 'absolute', top: '-12px', left: '20px', backgroundColor: '#3b82f6', color: 'white', fontSize: '0.65rem', padding: '0.3rem 0.8rem', borderRadius: '100px', fontWeight: 900 }}>{p.badge}</span>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div>
-                            <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#1e3a8a' }}>{p.name}</div>
-                            <div style={{ fontSize: '0.85rem', color: '#3b82f6', fontWeight: 700 }}>{p.limit} Mensajes Certificados</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.5rem', textDecoration: 'line-through' }}>Precio regular: ${p.originalPrice.toLocaleString()}</div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: 900, color: '#1e3a8a', fontSize: '1.4rem' }}>${p.price.toLocaleString()}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 900 }}>AHORRO: ${p.saving.toLocaleString()}</div>
-                          </div>
-                        </div>
-                        <div style={{ marginTop: '1.2rem', paddingTop: '1rem', borderTop: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#1e3a8a', fontWeight: 600 }}>Costo por notificación:</span>
-                          <span style={{ fontSize: '0.9rem', color: '#059669', fontWeight: 900 }}>${p.unitPrice.toLocaleString()} COP</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
+            </div>
               <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                 <h3 style={{ marginBottom: '1.5rem', fontSize: '1.1rem', fontWeight: 900 }}>📩 Nueva Notificación</h3>
                 
