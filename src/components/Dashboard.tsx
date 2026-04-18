@@ -323,7 +323,7 @@ const processPayment = async (e: React.FormEvent) => {
 
                 <button type="submit" disabled={isProcessing} style={{ marginTop: '1rem', padding: '1.2rem', borderRadius: '14px', backgroundColor: '#3b82f6', color: 'white', fontWeight: 900, border: 'none', cursor: 'pointer' }}>EMITIR NOTIFICACIÓN</button>
               </form>
-            )}
+            </div>
             <div style={{ marginTop: '2.5rem', backgroundColor: '#0f172a', color: '#60a5fa', padding: '1.2rem', borderRadius: '16px', fontFamily: 'monospace', fontSize: '0.7rem' }}>
               <div style={{ color: '#475569', marginBottom: '0.5rem', fontWeight: 900 }}>ENGINE_LOG_V2.9</div>
               {logs.map((log, i) => <div key={i} style={{ marginBottom: '0.2rem' }}>{log}</div>)}
