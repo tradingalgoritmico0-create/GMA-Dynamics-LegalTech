@@ -59,19 +59,6 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isPlanActive = () => {
-    if (!account?.expiresAt || account.plan.includes("Gratis")) return false;
-    return new Date(account.expiresAt) > new Date();
-  };
-
-  const getExtraPrice = (qty: number) => {
-    if (!account) return qty * 8000;
-    if (!isPlanActive()) return qty * 8000;
-    if (account.plan.includes('Medio')) return qty * 6000;
-    if (account.plan.includes('Pro')) return qty * 4000;
-    return qty * 8000;
-  };
-
   const upgradePlans = [
     { id: 'medio', name: 'Plan Medio Judicial', price: 60000, limit: 20, originalPrice: 160000, unitPrice: 3000, saving: 100000, badge: 'MÁS POPULAR' },
     { id: 'pro', name: 'Plan Pro Judicial', price: 196000, limit: 100, originalPrice: 800000, unitPrice: 1960, saving: 604000, badge: 'MAYOR AHORRO (75%)' }
@@ -82,7 +69,6 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
     if (!authUser) return;
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
     if (profile) {
-      if (profile.status === "Suspendido") setShowPaywall(true);
       const expires = new Date(profile.plan_start_date || profile.updated_at);
       expires.setDate(expires.getDate() + 30);
       setAccount({ username: user, plan: profile.plan, limit: profile.limit_msgs, sent: profile.sent_msgs, status: profile.status, expiresAt: expires.toISOString() });
@@ -95,137 +81,31 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
 
   useEffect(() => { loadDashboardData(); }, [loadDashboardData]);
 
-  const isPlanExpired = () => {
-    if (!account?.expiresAt) return false;
-    return new Date() > new Date(account.expiresAt);
-  };
-const processPayment = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!extraCard.number || !extraCard.expiry || !extraCard.cvc) return alert("Complete los datos de la tarjeta.");
-
-  setPaymentStatus('processing');
-  setPaymentErrorMsg('');
-  setIsProcessing(true);
-  try {
-    // 1. Tokenizar tarjeta en frontend (SDK oficial de MP — correcto)
-    const mp = new (window as any).MercadoPago(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
-    const [month, year] = extraCard.expiry.split('/');
-
-    const cardToken = await mp.createCardToken({
-      cardNumber: extraCard.number.replace(/\s/g, ''),
-      cardholderName: user,
-      cardExpirationMonth: month,
-      cardExpirationYear: '20' + year,
-      securityCode: extraCard.cvc,
-      identificationType: 'CC',
-      identificationNumber: formData.defendantId || '12345678' // Fallback a defendantId para consistencia de datos
-    });
-
-    if (!cardToken.id) throw new Error("Tarjeta rechazada por Mercado Pago.");
-
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-
-    if (!authUser || !account) throw new Error("Error de sesión");
-
-    const amount = paymentType === 'extra' ? getExtraPrice(extraQty) : selectedUpgradePlan?.price;
-    const description = paymentType === 'extra'
-      ? `Paquete ${extraQty} mensajes extra — GMA Dynamics`
-      : `${selectedUpgradePlan?.name} — GMA Dynamics`;
-
-    // 2. Llamar a la Edge Function — el servidor valida con MP y escribe en DB
-    const { data, error } = await supabase.functions.invoke('process-payment', {
-      body: {
-        token:        cardToken.id,
-        amount,
-        description,
-        user_id:      authUser.id,
-        payment_type: paymentType,
-        qty:          paymentType === 'extra' ? extraQty : undefined,
-        plan_id:      paymentType === 'upgrade' ? selectedUpgradePlan?.id : undefined,
-      },
-    });
-
-    if (error || !data?.success) {
-      throw new Error(data?.error ?? error?.message ?? 'Error en el servidor de pagos');
-    }
-
-    // 3. Sincronizar estado desde Supabase (la fuente de verdad ya fue actualizada por la Edge Function)
-    await loadDashboardData();
-    setPaymentStatus('success');
-    setExtraCard({ number: '', expiry: '', cvc: '' });
-  } catch (err: any) {
-    setPaymentStatus('error');
-    setPaymentErrorMsg(err.message);
-  } finally {
-    setIsProcessing(false);
-  }
-};
-
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.file || !account || account.sent >= account.limit) return;
+    if (!formData.file || !account) return;
     
-    // Lógica de Cooldown para Plan Gratis
-    if (account.plan.toLowerCase().includes('gratis')) {
-      const { data: lastMsg } = await supabase
-        .from('bitacora_mensajes')
-        .select('created_at')
-        .eq('owner_id', (await supabase.auth.getUser()).data.user?.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (lastMsg && lastMsg.length > 0) {
-        const lastSendTime = new Date(lastMsg[0].created_at).getTime();
-        const now = new Date().getTime();
-        if ((now - lastSendTime) < (30 * 60 * 1000)) {
-          alert("Debes esperar 30 minutos entre notificaciones en el Plan Gratis.");
-          return;
-        }
-      }
-    }
-
     setIsProcessing(true); setLogs([]);
     addLog("🛡️ Protocolo LegalTech v2.9...");
     try {
       addLog("🔐 Cifrando documento...");
       const pdfBytes = new Uint8Array(await formData.file.arrayBuffer());
-      
-      // LA SEGURIDAD ES PRIMERO: Se usa variable de entorno para la contraseña maestra.
-      // Se recomienda mover esta lógica a una Edge Function para máxima protección.
       const ownerPassword = import.meta.env.VITE_PDF_OWNER_PASSWORD || 'GMA_DEFAULT_OWNER_2026';
       
-      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { 
-        ownerPassword, 
-        allowModifying: false, 
-        allowCopying: false 
-      });
+      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { ownerPassword, allowModifying: false, allowCopying: false });
       const encryptedFile = new File([encryptedBytes], `Protegido_${formData.file.name}`, { type: 'application/pdf' });
       addLog("🧬 Generando Hash SHA-256...");
-      const arrayBuffer = await encryptedFile.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', await encryptedFile.arrayBuffer());
       const fileHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      
       addLog("🚀 Enviando evidencia...");
       const n8nData = new FormData();
       Object.entries(formData).forEach(([k, v]) => v && n8nData.append(k, v));
       n8nData.set('file', encryptedFile); n8nData.append('hash', fileHash);
       await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
+      
       await supabase.from('notifications').insert([{ case_name: formData.caseName, phone: formData.phone, email: formData.email, defendant_id: formData.defendantId, file_hash: fileHash, owner_id: (await supabase.auth.getUser()).data.user?.id }]);
       
-      // Incrementar contador de forma atómica — UPDATE...RETURNING sin bloqueos FOR UPDATE
-      // authUser ya fue obtenido al inicio del bloque, no volver a llamar getUser()
-      const { data: rpcData, error: rpcError } = await supabase.rpc('increment_message_count', { user_id: (await supabase.auth.getUser()).data.user?.id });
-      if (rpcError) throw new Error("Error al incrementar contador: " + rpcError.message);
-
-      // can_send = false significa que se alcanzó el límite en este envío
-      if (rpcData && rpcData.length > 0) {
-        if (!rpcData[0].can_send && rpcData[0].new_sent_msgs === rpcData[0].new_limit_msgs) {
-          addLog("⚠️ Límite de mensajes alcanzado.");
-        }
-        // Actualizar estado local inmediatamente — elimina el bug de F5
-        setAccount(prev => prev ? { ...prev, sent: rpcData[0].new_sent_msgs, limit: rpcData[0].new_limit_msgs } : null);
-      }
-
-      // Sincronizar notificaciones desde Supabase (el contador ya está actualizado en el estado local)
       await loadDashboardData();
       addLog("✅ Certificado judicial emitido.");
       setFormData({ caseName: '', phone: '', email: '', defendantId: '', file: null });
