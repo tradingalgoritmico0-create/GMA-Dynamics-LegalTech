@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import CertificateViewer from './CertificateViewer';
 
@@ -9,6 +9,7 @@ interface Notification {
   recipient: string;
   email: string;
   status: 'Procesando' | 'Enviado' | 'Entregado' | 'Leído';
+  emailStatus: 'Enviado' | 'Recibido' | 'Abierto';
   hash: string;
   owner: string;
 }
@@ -39,7 +40,7 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
       setAccount({ username: user, plan: profile.plan, limit: profile.limit_msgs, sent: profile.sent_msgs, status: profile.status, expiresAt: expires.toISOString() });
     }
     const { data: notifs } = await supabase.from('notifications').select('*').eq('owner_id', authUser.id).order('created_at', { ascending: false });
-    if (notifs) setNotifications(notifs.map(n => ({ id: n.id, caseName: n.case_name, date: new Date(n.created_at).toLocaleString(), recipient: n.phone, email: n.email, status: n.status, hash: n.file_hash, owner: user })));
+    if (notifs) setNotifications(notifs.map(n => ({ id: n.id, caseName: n.case_name, date: new Date(n.created_at).toLocaleString(), recipient: n.phone, email: n.email, status: n.status, emailStatus: 'Enviado', hash: n.file_hash, owner: user })));
   }, [user]);
 
   useEffect(() => { loadDashboardData(); }, [loadDashboardData]);
