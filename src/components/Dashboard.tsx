@@ -13,7 +13,6 @@ import {
   BarChart3, 
   Upload, 
   Clock, 
-  CheckCircle2,
   Hash
 } from 'lucide-react';
 
@@ -162,7 +161,7 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
 
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', marginTop: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: '1rem' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{user?.[0]?.toUpperCase()}</div>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>{user?.[0]?.toUpperCase()}</div>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{user}</div>
               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{account?.plan || 'Cargando...'}</div>
