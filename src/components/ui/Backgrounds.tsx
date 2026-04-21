@@ -47,7 +47,7 @@ export const GridBackground = ({ children, className = "", style = {} }: { child
 
 export const DottedBackground = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => {
   return (
-    <div className={`relative w-full overflow-hidden ${className}`} style={{ position: 'relative', backgroundColor: '#0F172A', ...style }}>
+    <div className={`relative w-full min-h-screen overflow-hidden ${className}`} style={{ position: 'relative', backgroundColor: '#0F172A', minHeight: '100vh', ...style }}>
       {/* Structural Dot Layer */}
       <div style={{ 
              position: 'absolute',
