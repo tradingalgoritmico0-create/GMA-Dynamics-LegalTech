@@ -26,6 +26,7 @@ interface Notification {
   emailStatus: 'Enviado' | 'Recibido' | 'Abierto';
   hash: string;
   owner: string;
+  created_at_raw?: string;
 }
 
 interface UserAccount {
@@ -37,17 +38,17 @@ interface UserAccount {
   expiresAt: string | null;
 }
 
-const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) => {
+const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user: string, onNavigate: (v: string) => void }) => {
   const [formData, setFormData] = useState({ caseName: '', phone: '', email: user || '', defendantId: '', file: null as File | null });
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Notification | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [account, setAccount] = useState<UserAccount | null>(null);
-  const [activeTab, setActiveTab] = useState<'notifications' | 'settings'>('notifications');
 
   const loadDashboardData = useCallback(async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) return;
+    
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
     if (profile) {
       const expires = new Date(profile.plan_start_date || profile.updated_at);
@@ -61,18 +62,34 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
         expiresAt: expires.toISOString() 
       });
     }
+
     const { data: notifs } = await supabase.from('notifications').select('*').eq('owner_id', authUser.id).order('created_at', { ascending: false });
-    if (notifs) setNotifications(notifs.map(n => ({ 
-      id: n.id, 
-      caseName: n.case_name, 
-      date: new Date(n.created_at).toLocaleString(), 
-      recipient: n.phone, 
-      email: n.email, 
-      status: n.status, 
-      emailStatus: 'Enviado', 
-      hash: n.file_hash, 
-      owner: user 
-    })));
+    
+    if (notifs && profile) {
+      // Lógica de Retención Visual según Plan
+      const now = new Date();
+      const filteredNotifs = notifs.filter(n => {
+        const createdAt = new Date(n.created_at);
+        const diffMonths = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
+        
+        if (profile.plan === 'Plan Gratis Judicial') return diffMonths <= 2;
+        if (profile.plan === 'Plan Medio Judicial') return diffMonths <= 12;
+        return diffMonths <= 60; // Pro: 5 años
+      });
+
+      setNotifications(filteredNotifs.map(n => ({ 
+        id: n.id, 
+        caseName: n.case_name, 
+        date: new Date(n.created_at).toLocaleString(), 
+        recipient: n.phone, 
+        email: n.email, 
+        status: n.status, 
+        emailStatus: 'Enviado', 
+        hash: n.file_hash, 
+        owner: user,
+        created_at_raw: n.created_at
+      })));
+    }
   }, [user]);
 
   useEffect(() => { loadDashboardData(); }, [loadDashboardData]);
@@ -136,26 +153,25 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
 
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <button 
-            onClick={() => setActiveTab('notifications')}
             style={{ 
               display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', borderRadius: '12px',
-              backgroundColor: activeTab === 'notifications' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-              color: activeTab === 'notifications' ? '#60a5fa' : '#94a3b8',
+              backgroundColor: 'rgba(59, 130, 246, 0.15)',
+              color: '#60a5fa',
               textAlign: 'left', fontWeight: 600
             }}
           >
             <Send size={20} /> Notificaciones
           </button>
           <button 
-            onClick={() => setActiveTab('settings')}
+            onClick={() => onNavigate('settings')}
             style={{ 
               display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', borderRadius: '12px',
-              backgroundColor: activeTab === 'settings' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-              color: activeTab === 'settings' ? '#60a5fa' : '#94a3b8',
+              backgroundColor: 'transparent',
+              color: '#94a3b8',
               textAlign: 'left', fontWeight: 600
             }}
           >
-            <Settings size={20} /> Configuración
+            <Settings size={20} /> Ajustes
           </button>
         </nav>
 
@@ -168,7 +184,7 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
             </div>
           </div>
           <button onClick={onLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', borderRadius: '12px', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.05)', fontWeight: 700 }}>
-            <LogOut size={20} /> Salir del Sistema
+            <LogOut size={20} /> Salir
           </button>
         </div>
       </aside>
@@ -327,11 +343,11 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Infraestructura Elite</h3>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                Su cuenta cuenta con respaldo judicial completo y almacenamiento de evidencias por 5 años.
+                Su cuenta cuenta con respaldo judicial completo y almacenamiento de evidencias por {account?.plan === 'Plan Gratis Judicial' ? '2 meses' : (account?.plan === 'Plan Medio Judicial' ? '1 año' : '5 años')}.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button onClick={() => alert("Redireccionando a PSE...")} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700 }}>Mejorar Plan</button>
-                <button onClick={() => alert("Redireccionando a PSE...")} style={{ flex: 1, padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700 }}>Recargar</button>
+                <button onClick={() => onNavigate('settings')} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700 }}>Mejorar Plan</button>
+                <button onClick={() => onNavigate('settings')} style={{ flex: 1, padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700 }}>Seguridad</button>
               </div>
             </motion.div>
           </div>
@@ -342,4 +358,3 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
 };
 
 export default Dashboard;
-

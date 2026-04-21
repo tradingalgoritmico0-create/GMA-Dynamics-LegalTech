@@ -1,37 +1,38 @@
-# Estado del Proyecto: GMA Dynamics LegalTech
+# GMA Dynamics: Protocolo de Ingeniería y Diseño de Élite
 
-## Objetivo General
-Desarrollar una plataforma LegalTech profesional para notificaciones judiciales certificadas bajo la Ley 2213 de 2022, utilizando React, Framer Motion y Supabase con alta seguridad criptográfica.
+Este documento es el mandato constitucional para el desarrollo de GMA Dynamics. Cualquier agente de IA que trabaje en este repositorio DEBE adherirse estrictamente a estas reglas.
 
-## 🛠️ Configuraciones y Conocimientos Clave
-- **Credenciales Master Admin:** `admin` / `GMA_Admin_2026!` (Bypass en `Login.tsx`).
-- **Contraseña Maestra de PDFs:** `GMA_ADMIN_MASTER_2026` (Owner password para archivos cifrados).
-- **Seguridad:** Cifrado AES-256 local. El Hash SHA-256 se calcula sobre el archivo cifrado final.
-- **Base de Datos:** Tabla `profiles` en Supabase gestiona planes y límites.
-- **Tipografía:** Cormorant Garamond (Serif) e Inter (Sans).
-- **Colores:** Azul marino profundo (#0F172A), Gris pizarra y acentos en Azul profesional.
+## 🏛️ Visión Arquitectónica
+GMA Dynamics es una plataforma de **LegalTech de Alta Precisión**. La estética debe ser minimalista, autoritaria y técnica. No se aceptan diseños genéricos de SaaS.
 
-## 🚀 Cambios Recientes (Sesión Actual)
-1. **Login & Pago:**
-   - Se eliminaron PSE y Efecty; se dejó únicamente **Tarjeta de Crédito/Débito** con estética de Mercado Pago.
-   - Se corrigieron los márgenes blancos en el Login; ahora el fondo `DottedBackground` es inmersivo (fixed inset 0).
-   - Se restauró el checkbox de **Términos y Condiciones** y el modal legal.
-2. **Admin Dashboard:**
-   - Se eliminaron todos los datos ficticios/Mock. El panel ahora muestra usuarios **reales** de Supabase.
-   - Se habilitó la **edición de planes** (Gratis, Medio, Pro) y el ajuste de **límites de mensajes** en tiempo real.
-3. **Estabilidad Visual:**
-   - Se bloqueó el **desplazamiento horizontal** globalmente en `index.css`.
-   - Se corrigieron errores de tipado en `Hero.tsx` y `Features.tsx` para compatibilidad con Framer Motion.
-   - Se añadió soporte para la prop `style` en los componentes de fondo (`Backgrounds.tsx`).
+## 🛠️ Reglas de Oro
+1. **Integridad del Código**: NO eliminar funcionalidad existente a menos que se pida expresamente.
+2. **Seguridad Proactiva**: Nunca exponer variables de entorno o credenciales.
+3. **Estética "Legal Blue"**: 
+   - Colores: Deep Navy (#0F172A), Slate Blue (#3b82f6), Surface (#F8FAFC).
+   - Tipografía: Playfair Display para títulos (Autoridad), Inter para datos (Precisión).
 
-## 📋 Estado de Tareas
-- [x] Upgrade visual LegalTech Pro.
-- [x] Sincronización de Hash criptográfico post-cifrado.
-- [x] Implementación de Términos y Condiciones.
-- [x] Bypass de Super Admin y gestión de usuarios reales.
-- [x] Corrección de bugs visuales (márgenes y scroll horizontal).
-- [ ] Configurar webhooks reales para estados de lectura en n8n (Pendiente).
+## 🧩 Flujos Críticos
+### 1. Selección de Plan (OAuth/Google)
+- El plan seleccionado en la Landing se persiste en `localStorage` (`gma_selected_plan`).
+- Al iniciar sesión, si el perfil no existe, `App.tsx` DEBE crearlo usando este valor o solicitar confirmación.
 
-## 💡 Notas para la Próxima Sesión
-- Verificar que las políticas de RLS en Supabase permitan al admin (anon/auth) leer y actualizar la tabla `profiles`.
-- El flujo de envío judicial en `Dashboard.tsx` ya calcula el Hash correctamente sobre el archivo cifrado.
+### 2. Retención de Datos según Plan
+- **Gratis**: Acceso visual a evidencias por 2 meses.
+- **Medio**: Acceso visual por 1 año.
+- **Pro**: Acceso configurable de 1 a 5 años.
+- *Nota: Los archivos físicos no se borran por cumplimiento legal, solo se restringe el acceso en la UI.*
+
+## 🚀 Estándares de Componentes
+- Usar **Bento Grids** para Dashboards.
+- Usar **Glassmorphism** sutil (backdrop-blur).
+- Implementar micro-interacciones con **Framer Motion**.
+- Iconografía minimalista con **Lucide Icons**.
+
+## 📁 Estructura del Proyecto
+- `/src/components`: Componentes UI atómicos y modulares.
+- `/src/lib`: Clientes de API (Supabase, etc).
+- `/supabase`: Esquemas y migraciones (No modificar sin auditoría).
+
+---
+*Documento generado por Gemini CLI - 21 de Abril de 2026*

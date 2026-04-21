@@ -10,17 +10,19 @@ import PublicValidator from './components/PublicValidator'
 import AdminDashboard from './components/AdminDashboard'
 import PublicView from './components/PublicView'
 import TermsOfService from './components/TermsOfService'
+import SettingsView from './components/Settings'
 import { supabase } from './lib/supabaseClient'
+import { Shield, Zap, Crown, ArrowRight } from 'lucide-react'
 
 function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view'>('landing');
+  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view' | 'settings'>('landing');
   const [user, setUser] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [verifyData, setVerifyData] = useState<{hash: string, caseName: string} | null>(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   useEffect(() => {
-    // A. Detección de ruta pública para visor de demandas
     const checkPath = () => {
       const path = window.location.pathname;
       if (path.startsWith('/view/')) {
@@ -30,14 +32,12 @@ function App() {
     checkPath();
     window.addEventListener('popstate', checkPath);
 
-    // B. Verificar sesión inicial
     const checkInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
         const userEmail = session.user.email?.trim().toLowerCase();
 
-        // A. VERIFICACIÓN DE ADMINISTRADOR
         try {
           const { data: isAdmin } = await supabase.rpc('is_admin');
           if (isAdmin) {
@@ -46,34 +46,16 @@ function App() {
             setView('admin');
             return;
           }
-        } catch (err) { /* Admin check failed or not an admin */ }
+        } catch (err) { /* Not admin */ }
 
-        // B. USUARIOS NORMALES
         if (session.user) {
-          // Auto-provisión de perfil si no existe (Fix para Google Login)
           const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
           
           if (!profile) {
-            const pendingPlan = localStorage.getItem('gma_selected_plan') || 'Gratis Judicial';
-            const limits: Record<string, number> = {
-              'Plan Gratis Judicial': 5,
-              'Plan Medio Judicial': 20,
-              'Plan Pro Judicial': 100
-            };
-            
-            // Normalizar nombre del plan si viene de los botones de Pricing
-            let planName = 'Plan Gratis Judicial';
-            if (pendingPlan.includes('Medio')) planName = 'Plan Medio Judicial';
-            else if (pendingPlan.includes('Pro')) planName = 'Plan Pro Judicial';
-
-            await supabase.from('profiles').insert([{
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-              plan: planName,
-              limit_msgs: limits[planName] || 5,
-              status: 'Activo'
-            }]);
-            localStorage.removeItem('gma_selected_plan');
+            setShowPlanModal(true);
+            setUser(session.user.email || '');
+            setRole('user');
+            return;
           }
 
           setUser(session.user.email || '');
@@ -87,10 +69,8 @@ function App() {
 
     checkInitialSession();
 
-    // 2. Escuchar cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === 'SIGNED_IN') {
-        // Refrescar estatus de sesión para decidir vista
         checkInitialSession();
       } else if (event === 'SIGNED_OUT') {
         setView('landing');
@@ -99,7 +79,6 @@ function App() {
       }
     });
 
-    // 3. Manejar verificaciones públicas (Hash)
     const params = new URLSearchParams(window.location.search);
     const hash = params.get('hash');
     const caseName = params.get('case');
@@ -118,6 +97,68 @@ function App() {
     setView('landing');
   };
 
+  const handlePlanSelection = async (planName: string) => {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return;
+
+    const limits: Record<string, number> = {
+      'Plan Gratis Judicial': 5,
+      'Plan Medio Judicial': 20,
+      'Plan Pro Judicial': 100
+    };
+
+    const { error } = await supabase.from('profiles').insert([{
+      id: authUser.id,
+      full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
+      plan: planName,
+      limit_msgs: limits[planName] || 5,
+      status: 'Activo'
+    }]);
+
+    if (error) {
+      alert("Error al crear perfil. Por favor intente de nuevo.");
+      return;
+    }
+
+    setShowPlanModal(false);
+    setView('dashboard');
+  };
+
+  if (showPlanModal) {
+    return (
+      <main style={{ minHeight: '100vh', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: 'var(--font-sans)' }}>
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ backgroundColor: 'white', padding: '3.5rem', borderRadius: '40px', maxWidth: '600px', width: '100%', textAlign: 'center', boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)' }}>
+          <div style={{ backgroundColor: '#eff6ff', width: '80px', height: '80px', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
+            <Shield size={40} color="#3b82f6" />
+          </div>
+          <h2 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-serif)', marginBottom: '1rem', fontWeight: 800 }}>Confirmar suscripción</h2>
+          <p style={{ color: '#64748b', marginBottom: '3rem', fontSize: '1.1rem', lineHeight: 1.6 }}>Para activar su despacho digital y comenzar a emitir notificaciones certificadas, por favor confirme su plan.</p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {[
+              { id: 'Plan Gratis Judicial', name: 'Gratis Judicial', icon: <Shield size={22} color="#3b82f6" />, desc: '5 Notificaciones certificadas / mes' },
+              { id: 'Plan Medio Judicial', name: 'Medio Judicial', icon: <Zap size={22} color="#f59e0b" />, desc: '20 Notificaciones certificadas / mes' },
+              { id: 'Plan Pro Judicial', name: 'Pro Judicial', icon: <Crown size={22} color="#3b82f6" />, desc: '100 Notificaciones certificadas / mes' }
+            ].map(p => (
+              <button 
+                key={p.id} 
+                onClick={() => handlePlanSelection(p.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '1.75rem', borderRadius: '24px', border: '1px solid #e2e8f0', backgroundColor: 'white', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+              >
+                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '16px' }}>{p.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem' }}>{p.name}</div>
+                  <div style={{ fontSize: '0.9rem', color: '#64748b', marginTop: '0.2rem' }}>{p.desc}</div>
+                </div>
+                <ArrowRight size={20} color="#cbd5e1" />
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      </main>
+    );
+  }
+
   if (view === 'verify' && verifyData) {
     return <PublicValidator hash={verifyData.hash} caseName={verifyData.caseName} />;
   }
@@ -135,7 +176,11 @@ function App() {
   }
 
   if (view === 'dashboard' && user) {
-    return <Dashboard onLogout={handleLogout} user={user} />;
+    return <Dashboard onLogout={handleLogout} user={user} onNavigate={(v) => setView(v as any)} />;
+  }
+
+  if (view === 'settings' && user) {
+    return <SettingsView onBack={() => setView('dashboard')} user={user} onLogout={handleLogout} />;
   }
 
   return (
