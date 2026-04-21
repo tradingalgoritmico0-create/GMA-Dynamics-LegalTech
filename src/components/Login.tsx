@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DottedBackground } from './ui/Backgrounds';
 import TermsOfService from './TermsOfService';
 
@@ -42,7 +42,7 @@ const Login = () => {
 
   return (
     <DottedBackground className="min-h-screen w-full flex items-center justify-center">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: '3rem', width: '100%', maxWidth: '400px', backgroundColor: 'white', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '3rem', width: '100%', maxWidth: '400px', backgroundColor: 'white', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
         <h2 style={{ textAlign: 'center', marginBottom: '2rem', fontWeight: 900 }}>GMA Dynamics</h2>
         <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {isRegistering && <input type="text" placeholder="Nombre completo" value={fullName} onChange={e => setFullName(e.target.value)} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }} required />}
