@@ -1,38 +1,48 @@
 # GMA Dynamics: Protocolo de Ingeniería y Diseño de Élite
 
-Este documento es el mandato constitucional para el desarrollo de GMA Dynamics. Cualquier agente de IA que trabaje en este repositorio DEBE adherirse estrictamente a estas reglas.
+> **INSTRUCCIÓN MAESTRA PARA AGENTES IA:** 
+> Lee este documento en su totalidad antes de realizar cualquier acción. Actúa como un Senior Full-Stack Engineer & UI/UX Expert.
+
+## 🧠 Master Prompt de Activación
+"Para cada sesión de trabajo en este repositorio, debes:
+1. **Activar Skills**: Inicia activando `ui-ux-pro-max` y `fullstack-developer`.
+2. **Contexto de Élite**: Adopta una mentalidad de 'Cero Errores' y estética 'LegalTech Premium'.
+3. **Flujo Obligatorio (Post-Programación)**: 
+   - Antes de dar por terminada una tarea o subir a Git, ejecuta SIEMPRE `npm run build` en el directorio del frontend.
+   - Si el build falla por imports no usados o errores de tipos, CORRÍGELOS inmediatamente. No se permite subir código que rompa el despliegue.
+4. **Protocolo Git**: Solo realiza `git push` tras un build exitoso y usa mensajes de commit semánticos (feat, fix, refactor)."
 
 ## 🏛️ Visión Arquitectónica
 GMA Dynamics es una plataforma de **LegalTech de Alta Precisión**. La estética debe ser minimalista, autoritaria y técnica. No se aceptan diseños genéricos de SaaS.
 
-## 🛠️ Reglas de Oro
-1. **Integridad del Código**: NO eliminar funcionalidad existente a menos que se pida expresamente.
-2. **Seguridad Proactiva**: Nunca exponer variables de entorno o credenciales.
+## 🛠️ Reglas de Oro (Innegociables)
+1. **Integridad Absoluta**: NO eliminar funcionalidad, labels, lógica o letras existentes a menos que el usuario lo pida expresamente.
+2. **Validación Pre-Commit**: Prohibido subir cambios sin validar el build localmente.
 3. **Estética "Legal Blue"**: 
-   - Colores: Deep Navy (#0F172A), Slate Blue (#3b82f6), Surface (#F8FAFC).
-   - Tipografía: Playfair Display para títulos (Autoridad), Inter para datos (Precisión).
+   - **Colores**: Deep Navy (`#0F172A`), Slate Blue (`#3b82f6`), Surface (`#F8FAFC`).
+   - **Tipografía**: `Playfair Display` para títulos (Autoridad), `Inter` para datos (Precisión).
 
-## 🧩 Flujos Críticos
-### 1. Selección de Plan (OAuth/Google)
-- El plan seleccionado en la Landing se persiste en `localStorage` (`gma_selected_plan`).
-- Al iniciar sesión, si el perfil no existe, `App.tsx` DEBE crearlo usando este valor o solicitar confirmación.
+## 🧩 Flujos Críticos de Negocio
+### 1. Garantía de Selección de Plan
+- Todo usuario nuevo DEBE pasar por el modal de confirmación de plan en `App.tsx` si no tiene un perfil asignado.
+- La persistencia inicial se intenta vía `localStorage`, pero el modal es la red de seguridad final.
 
-### 2. Retención de Datos según Plan
-- **Gratis**: Acceso visual a evidencias por 2 meses.
-- **Medio**: Acceso visual por 1 año.
-- **Pro**: Acceso configurable de 1 a 5 años.
-- *Nota: Los archivos físicos no se borran por cumplimiento legal, solo se restringe el acceso en la UI.*
+### 2. Retención de Datos y Visibilidad
+- **Plan Gratis**: 2 meses de acceso visual.
+- **Plan Medio**: 1 año de acceso visual.
+- **Plan Pro**: 5 años de acceso visual (configurable).
+- *Nota: Los documentos son inmutables y no se borran del storage por cumplimiento de ley.*
 
 ## 🚀 Estándares de Componentes
-- Usar **Bento Grids** para Dashboards.
-- Usar **Glassmorphism** sutil (backdrop-blur).
-- Implementar micro-interacciones con **Framer Motion**.
-- Iconografía minimalista con **Lucide Icons**.
+- **Layout**: Dashboards basados en **Bento Grids**.
+- **Efectos**: Glassmorphism sutil (`backdrop-blur`).
+- **Animaciones**: Micro-interacciones fluidas con `framer-motion` (staggered).
+- **Iconos**: Únicamente `lucide-react`.
 
-## 📁 Estructura del Proyecto
-- `/src/components`: Componentes UI atómicos y modulares.
-- `/src/lib`: Clientes de API (Supabase, etc).
-- `/supabase`: Esquemas y migraciones (No modificar sin auditoría).
+## 📁 Directorios Clave
+- `/src/components`: Componentes modulares (Dashboard, Settings, Login, etc).
+- `/src/lib`: Clientes de infraestructura (Supabase, API).
+- `/GEMINI.md`: Este protocolo.
 
 ---
-*Documento generado por Gemini CLI - 21 de Abril de 2026*
+*Documento de Mandato Constitucional - Actualizado el 21 de Abril de 2026*
