@@ -72,7 +72,7 @@ const Login = () => {
           gridTemplateColumns: 'minmax(400px, 1fr) minmax(400px, 1.2fr)', 
           overflow: 'hidden', 
           backgroundColor: 'rgba(255, 255, 255, 0.03)', 
-          borderRadius: '40px',
+          borderRadius: '48px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)',
           alignSelf: 'center'

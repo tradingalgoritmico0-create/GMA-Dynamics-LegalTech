@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import FinancialDashboard from './FinancialDashboard';
+import { Users, BarChart3, LogOut } from 'lucide-react';
 
 const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [users, setUsers] = useState<any[]>([]);
@@ -24,50 +25,56 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
   };
 
   return (
-    <div style={{ padding: '3rem', backgroundColor: '#f1f5f9', minHeight: '100vh' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+    <div style={{ padding: '3rem', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'var(--font-sans)' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, margin: 0 }}>Panel de Control Maestro</h1>
-          <p style={{ color: '#64748b' }}>Gestión centralizada de abogados y notificaciones</p>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-serif)', color: '#0f172a' }}>Panel de Control Maestro</h1>
+          <p style={{ color: '#64748b' }}>Gestión centralizada de infraestructura GMA Dynamics</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={() => setActiveTab('users')} style={{ padding: '0.8rem 1.5rem', backgroundColor: activeTab === 'users' ? '#0f172a' : 'white', color: activeTab === 'users' ? 'white' : '#0f172a', border: '1px solid #0f172a', borderRadius: '10px', cursor: 'pointer' }}>Abogados</button>
-            <button onClick={() => setActiveTab('finance')} style={{ padding: '0.8rem 1.5rem', backgroundColor: activeTab === 'finance' ? '#0f172a' : 'white', color: activeTab === 'finance' ? 'white' : '#0f172a', border: '1px solid #0f172a', borderRadius: '10px', cursor: 'pointer' }}>Finanzas</button>
-            <button onClick={onLogout} style={{ padding: '0.8rem 1.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer' }}>Cerrar Sesión</button>
+        <div style={{ display: 'flex', gap: '1rem', backgroundColor: 'white', padding: '0.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+            <button onClick={() => setActiveTab('users')} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', backgroundColor: activeTab === 'users' ? '#0f172a' : 'transparent', color: activeTab === 'users' ? 'white' : '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users size={18} /> Abogados
+            </button>
+            <button onClick={() => setActiveTab('finance')} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', backgroundColor: activeTab === 'finance' ? '#0f172a' : 'transparent', color: activeTab === 'finance' ? 'white' : '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BarChart3 size={18} /> Finanzas
+            </button>
+            <button onClick={onLogout} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', backgroundColor: '#ef4444', color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <LogOut size={18} /> Salir
+            </button>
         </div>
-      </div>
+      </header>
 
       {activeTab === 'users' ? (
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-            {loading ? <p>Cargando abogados...</p> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '32px', padding: '2rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
+            {loading ? <p style={{ padding: '2rem', textAlign: 'center' }}>Sincronizando con base de datos...</p> : (
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
                 <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid #f1f5f9', color: '#64748b', fontSize: '0.8rem' }}>
+                <tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
                     <th style={{ padding: '1rem' }}>ABOGADO</th>
-                    <th>PLAN</th>
-                    <th>CONSUMO</th>
-                    <th>ESTADO</th>
-                    <th>ACCIONES</th>
+                    <th style={{ padding: '1rem' }}>PLAN</th>
+                    <th style={{ padding: '1rem' }}>CONSUMO</th>
+                    <th style={{ padding: '1rem' }}>ESTADO</th>
+                    <th style={{ padding: '1rem' }}>ACCIONES</th>
                 </tr>
                 </thead>
                 <tbody>
                 {users.map(u => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '1rem' }}>
-                        <div style={{ fontWeight: 800 }}>{u.full_name}</div>
+                    <tr key={u.id} style={{ backgroundColor: '#f8fafc' }}>
+                    <td style={{ padding: '1.25rem 1rem', borderRadius: '16px 0 0 16px' }}>
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{u.full_name}</div>
                         <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
                     </td>
-                    <td>{u.plan}</td>
-                    <td><span style={{ fontWeight: 700 }}>{u.sent_msgs}</span> / {u.limit_msgs}</td>
-                    <td>
-                        <span style={{ padding: '0.3rem 0.6rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: u.status === 'Activo' ? '#dcfce7' : '#fee2e2' }}>
+                    <td style={{ padding: '1.25rem 1rem' }}>{u.plan}</td>
+                    <td style={{ padding: '1.25rem 1rem' }}><span style={{ fontWeight: 800 }}>{u.sent_msgs}</span> / {u.limit_msgs}</td>
+                    <td style={{ padding: '1.25rem 1rem' }}>
+                        <span style={{ padding: '0.4rem 0.8rem', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: u.status === 'Activo' ? '#dcfce7' : '#fee2e2', color: u.status === 'Activo' ? '#166534' : '#991b1b' }}>
                         {u.status}
                         </span>
                     </td>
-                    <td>
+                    <td style={{ padding: '1.25rem 1rem', borderRadius: '0 16px 16px 0' }}>
                         <button 
                         onClick={() => toggleStatus(u.id, u.status)}
-                        style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', backgroundColor: '#0f172a', color: 'white', cursor: 'pointer', fontSize: '0.8rem' }}
+                        style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', border: 'none', backgroundColor: '#0f172a', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
                         >
                         {u.status === 'Activo' ? 'Suspender' : 'Activar'}
                         </button>

@@ -98,30 +98,39 @@ function App() {
   };
 
   const handlePlanSelection = async (planName: string) => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) return;
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        console.error("No hay usuario autenticado.");
+        return;
+      }
 
-    const limits: Record<string, number> = {
-      'Plan Gratis Judicial': 5,
-      'Plan Medio Judicial': 20,
-      'Plan Pro Judicial': 100
-    };
+      const limits: Record<string, number> = {
+        'Plan Gratis Judicial': 5,
+        'Plan Medio Judicial': 20,
+        'Plan Pro Judicial': 100
+      };
 
-    const { error } = await supabase.from('profiles').insert([{
-      id: authUser.id,
-      full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
-      plan: planName,
-      limit_msgs: limits[planName] || 5,
-      status: 'Activo'
-    }]);
+      const { error } = await supabase.from('profiles').insert([{
+        id: authUser.id,
+        full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
+        plan: planName,
+        limit_msgs: limits[planName] || 5,
+        status: 'Activo'
+      }]);
 
-    if (error) {
-      alert("Error al crear perfil. Por favor intente de nuevo.");
-      return;
+      if (error) {
+        console.error("Error Supabase:", error);
+        alert(`Error al crear perfil: ${error.message}`);
+        return;
+      }
+
+      setShowPlanModal(false);
+      setView('dashboard');
+      window.location.reload();
+    } catch (e) {
+      console.error("Error inesperado:", e);
     }
-
-    setShowPlanModal(false);
-    setView('dashboard');
   };
 
   if (showPlanModal) {
