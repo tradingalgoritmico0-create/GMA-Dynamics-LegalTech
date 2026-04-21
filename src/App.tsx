@@ -46,10 +46,36 @@ function App() {
             setView('admin');
             return;
           }
-        } catch (err) { console.error(err); }
+        } catch (err) { /* Admin check failed or not an admin */ }
 
         // B. USUARIOS NORMALES
         if (session.user) {
+          // Auto-provisión de perfil si no existe (Fix para Google Login)
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+          
+          if (!profile) {
+            const pendingPlan = localStorage.getItem('gma_selected_plan') || 'Gratis Judicial';
+            const limits: Record<string, number> = {
+              'Plan Gratis Judicial': 5,
+              'Plan Medio Judicial': 20,
+              'Plan Pro Judicial': 100
+            };
+            
+            // Normalizar nombre del plan si viene de los botones de Pricing
+            let planName = 'Plan Gratis Judicial';
+            if (pendingPlan.includes('Medio')) planName = 'Plan Medio Judicial';
+            else if (pendingPlan.includes('Pro')) planName = 'Plan Pro Judicial';
+
+            await supabase.from('profiles').insert([{
+              id: session.user.id,
+              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+              plan: planName,
+              limit_msgs: limits[planName] || 5,
+              status: 'Activo'
+            }]);
+            localStorage.removeItem('gma_selected_plan');
+          }
+
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
@@ -131,7 +157,7 @@ function App() {
       <div id="solucion"><Features /></div>
       <div id="marco"><LegalFramework /></div>
       <Pricing onSelectPlan={(plan) => {
-        console.log("Selected plan:", plan);
+        localStorage.setItem('gma_selected_plan', plan);
         setView('login');
       }} />
       <section style={{ backgroundColor: 'var(--primary)', color: 'white', textAlign: 'center', padding: '10rem 0', backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.95)), url("https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80")', backgroundSize: 'cover' }}>
