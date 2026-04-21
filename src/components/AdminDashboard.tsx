@@ -10,7 +10,7 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('get_all_users_admin');
+    const { data, error } = await supabase.from('profiles').select('*');
     if (error) console.error("Error cargando usuarios:", error);
     else setUsers(data || []);
     setLoading(false);

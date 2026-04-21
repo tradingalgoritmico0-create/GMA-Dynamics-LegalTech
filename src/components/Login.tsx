@@ -75,7 +75,7 @@ const Login = () => {
           borderRadius: '48px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)',
-          alignSelf: 'center'
+          alignItems: 'stretch'
         }}
       >
         {/* Branding Section */}

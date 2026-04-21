@@ -39,28 +39,27 @@ function App() {
         const userEmail = session.user.email?.trim().toLowerCase();
 
         try {
-          const { data: isAdmin } = await supabase.rpc('is_admin');
-          if (isAdmin) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+          
+          if (profile?.role === 'admin') {
             setRole('admin');
             setUser(userEmail || null);
             setView('admin');
             return;
           }
-        } catch (err) { /* Not admin */ }
 
-        if (session.user) {
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-          
-          if (!profile) {
+          if (profile) {
+            setUser(userEmail || null);
+            setRole('user');
+            setView('dashboard');
+          } else {
             setShowPlanModal(true);
             setUser(session.user.email || '');
             setRole('user');
             return;
           }
-
-          setUser(session.user.email || '');
-          setRole('user');
-          setView('dashboard');
+        } catch (err) { 
+          console.error("Error al obtener perfil:", err);
         }
       } else {
         setView('landing');
