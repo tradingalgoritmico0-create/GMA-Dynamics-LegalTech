@@ -25,34 +25,21 @@ const Login = () => {
     e.preventDefault();
     
     if (isRegistering && !acceptedTerms) {
-      alert("Debe aceptar los términos y condiciones para continuar.");
+      alert("Debe aceptar los términos y condiciones.");
       return;
     }
+
+    // Persistir plan antes de cualquier acción
+    localStorage.setItem('gma_selected_plan', selectedPlan);
 
     setIsProcessing(true);
     try {
       if (isRegistering) {
-        const { data, error } = await supabase.auth.signUp({ 
-          email, 
-          password, 
-          options: { data: { full_name: fullName } } 
+        const { error } = await supabase.auth.signUp({ 
+          email, password, options: { data: { full_name: fullName } } 
         });
         if (error) throw error;
-        
-        if (data.user) {
-          const limits: Record<string, number> = {
-            'Plan Gratis Judicial': 5,
-            'Plan Medio Judicial': 20,
-            'Plan Pro Judicial': 100
-          };
-          await supabase.from('profiles').upsert([{ 
-            id: data.user.id, 
-            full_name: fullName, 
-            status: 'Activo', 
-            plan: selectedPlan,
-            limit_msgs: limits[selectedPlan] || 5
-          }]);
-        }
+        // El App.tsx se encarga de crear el perfil con el plan de localStorage
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -72,7 +59,7 @@ const Login = () => {
   };
 
   return (
-    <DottedBackground className="min-h-screen w-full flex items-center justify-center p-4 m-0">
+    <DottedBackground className="min-h-screen w-full flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
@@ -80,13 +67,15 @@ const Login = () => {
         style={{ 
           width: '100%',
           maxWidth: '1100px', 
+          margin: '0 auto',
           display: 'grid', 
           gridTemplateColumns: 'minmax(400px, 1fr) minmax(400px, 1.2fr)', 
           overflow: 'hidden', 
           backgroundColor: 'rgba(255, 255, 255, 0.03)', 
           borderRadius: '40px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)'
+          boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)',
+          alignSelf: 'center'
         }}
       >
         {/* Branding Section */}
