@@ -41,9 +41,19 @@ const Login = () => {
     } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
   };
 
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({ 
+      provider: 'google', 
+      options: { 
+        redirectTo: window.location.origin,
+        queryParams: { prompt: 'select_account' }
+      } 
+    });
+  };
+
   return (
     <DottedBackground className="min-h-screen w-full flex items-center justify-center">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '3rem', width: '100%', maxWidth: '400px', backgroundColor: 'white', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card" style={{ padding: '3rem', width: '100%', maxWidth: '400px', backgroundColor: 'white', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
         <h2 style={{ textAlign: 'center', marginBottom: '2rem', fontWeight: 900 }}>GMA Dynamics</h2>
         <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {isRegistering && <input type="text" placeholder="Nombre completo" value={fullName} onChange={e => setFullName(e.target.value)} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }} required />}
@@ -51,6 +61,14 @@ const Login = () => {
           <input type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} style={{ padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }} required />
           {isRegistering && <label style={{ fontSize: '0.8rem' }}><input type="checkbox" checked={acceptTerms} onChange={e => setAcceptTerms(e.target.checked)} /> Acepto <button type="button" onClick={() => setShowTerms(true)} style={{ background:'none', border:'none', color:'blue', cursor:'pointer' }}>términos</button></label>}
           <button type="submit" style={{ padding: '1rem', backgroundColor: '#0f172a', color: 'white', borderRadius: '12px', border: 'none', cursor: 'pointer' }}>{isProcessing ? 'Procesando...' : (isRegistering ? 'Registrarse' : 'Iniciar Sesión')}</button>
+
+          <div style={{ textAlign: 'center', margin: '1rem 0', color: '#64748b' }}>o</div>
+
+          <button type="button" onClick={handleGoogleLogin} style={{ padding: '1rem', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" style={{ width: '20px' }} />
+            Continuar con Google
+          </button>
+
           <button type="button" onClick={() => setIsRegistering(!isRegistering)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.8rem' }}>
             {isRegistering ? '¿Ya tiene cuenta? Inicie sesión' : '¿No tiene cuenta? Regístrese'}
           </button>
@@ -59,6 +77,7 @@ const Login = () => {
       {showTerms && <TermsOfService onClose={() => setShowTerms(false)} />}
     </DottedBackground>
   );
+
 };
 
 export default Login;
