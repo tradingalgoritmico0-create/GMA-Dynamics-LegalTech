@@ -37,40 +37,27 @@ function App() {
       if (session?.user) {
         const userEmail = session.user.email?.trim().toLowerCase();
 
-        // A. VERIFICACIÓN DE ADMINISTRADOR (Validación en Servidor via RPC)
+        // A. VERIFICACIÓN DE ADMINISTRADOR
         try {
-          const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
-          
-          if (!adminError && isAdmin) {
-            console.log("🔓 ACCESO ADMINISTRATIVO VALIDADO.");
+          const { data: isAdmin } = await supabase.rpc('is_admin');
+          if (isAdmin) {
             setRole('admin');
             setUser(userEmail || null);
             setView('admin');
             return;
           }
-        } catch (err) {
-          console.error("Error verificando rol administrativo:", err);
-        }
+        } catch (err) { console.error(err); }
 
         // B. USUARIOS NORMALES
-        const { data: profile, error } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
 
-        if (!profile || error) {
-          // Si no hay perfil, lo enviamos al pago para que se cree
-          console.log("👤 Usuario Nuevo Detectado.");
-          setUser(session.user.email || '');
-          setRole('user');
-          setView('login');
-        } else if (profile.status === 'Activo') {
-          console.log("✅ Usuario Activo.");
+        if (profile?.status === 'Activo') {
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
         } else {
-          console.log("🔒 Usuario Inactivo.");
-          setUser(session.user.email || '');
-          setRole('user');
-          setView('login');
+          // Si el usuario existe pero no está activo, puede ir al login o landing
+          setView('landing');
         }
       } else {
         setView('landing');
