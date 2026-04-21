@@ -1,13 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
-import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 import { supabase } from '../lib/supabaseClient';
 import CertificateViewer from './CertificateViewer';
 
 interface Notification {
-  id: string;
+
   caseName: string;
   date: string;
   recipient: string;
@@ -38,16 +34,8 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedCert, setSelectedCert] = useState<Notification | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [account, setAccount] = useState<UserAccount | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentType, setPaymentType] = useState<'extra' | 'upgrade'>('extra');
-  const [extraQty, setExtraQty] = useState(1);
-  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<any>(null);
-  const [extraCard, setExtraCard] = useState({ number: '', expiry: '', cvc: '' });
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
-  const [paymentErrorMsg, setPaymentErrorMsg] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -132,16 +120,11 @@ const Dashboard = ({ onLogout, user }: { onLogout: () => void, user: string }) =
               <input type="file" onChange={e => setFormData({...formData, file: e.target.files?.[0] || null})} accept=".pdf" required style={{ padding: '0.85rem', border: '2px dashed #cbd5e1', borderRadius: '12px' }} />
               <button type="submit" disabled={isProcessing} style={{ padding: '1.2rem', backgroundColor: '#3b82f6', color: 'white', borderRadius: '14px', border: 'none', cursor: 'pointer' }}>EMITIR NOTIFICACIÓN</button>
             </form>
-
-            <div className="dash-card" style={{ padding: '1.5rem', borderRadius: '20px', border: '1px solid #3b82f6', marginTop: '2rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 900, marginBottom: '1rem' }}>🚀 Gestionar Capacidad</h3>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button onClick={() => setShowPaymentModal(true)} style={{ padding: '0.8rem', borderRadius: '12px', border: '1px solid #3b82f6', backgroundColor: '#eff6ff', cursor: 'pointer' }}>Gestionar Planes</button>
-                </div>
             </div>
-          </div>
+            </div>
 
-          <div className="dash-card" style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '28px', border: '1px solid #e2e8f0' }}>
+            <div className="dash-card" style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '28px', border: '1px solid #e2e8f0' }}>
+
             <h3 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '2.5rem' }}>Evidencia Judicial</h3>
             <table style={{ width: '100%' }}>
               <thead><tr><th>Caso</th><th>Estado</th></tr></thead>
