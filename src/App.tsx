@@ -49,15 +49,10 @@ function App() {
         } catch (err) { console.error(err); }
 
         // B. USUARIOS NORMALES
-        const { data: profile } = await supabase.from('profiles').select('status').eq('id', session.user.id).single();
-
-        if (profile?.status === 'Activo') {
+        if (session.user) {
           setUser(session.user.email || '');
           setRole('user');
           setView('dashboard');
-        } else {
-          // Si el usuario existe pero no está activo, puede ir al login o landing
-          setView('landing');
         }
       } else {
         setView('landing');
