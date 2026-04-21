@@ -17,7 +17,8 @@ const Login = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        window.location.reload();
+        console.log("Sesión activa detectada, redirigiendo...");
+        // En lugar de reload, simplemente permitimos que el App.tsx detecte el cambio de estado
       }
     };
     checkSession();
@@ -36,7 +37,7 @@ const Login = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      window.location.reload();
+      // No recargamos, dejamos que App.tsx gestione el estado
     } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
   };
 
