@@ -10,9 +10,26 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   const loadUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*');
-    if (error) console.error("Error cargando usuarios:", error);
-    else setUsers(data || []);
+    try {
+        const { data, error } = await supabase.rpc('get_all_profiles');
+        
+        if (error) {
+            console.error("Error RPC:", error);
+            const { data: fallbackData, error: fallbackError } = await supabase.from('profiles').select('*');
+            if (fallbackError) {
+                console.error("Error Fallback:", fallbackError);
+                alert("Error cargando perfiles. Revisa la consola.");
+            } else {
+                console.log("Datos recuperados vía Fallback:", fallbackData);
+                setUsers(fallbackData || []);
+            }
+        } else {
+            console.log("Datos recuperados vía RPC:", data);
+            setUsers(data || []);
+        }
+    } catch (e) {
+        console.error("Error inesperado:", e);
+    }
     setLoading(false);
   };
 
