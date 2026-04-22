@@ -11,6 +11,7 @@ interface UserProfile {
   sent_msgs: number;
   limit_msgs: number;
   status: string;
+  next_billing_date?: string;
 }
 
 const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
@@ -80,35 +81,53 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
                 <tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase' }}>
                     <th style={{ padding: '1rem' }}>ABOGADO</th>
                     <th style={{ padding: '1rem' }}>PLAN</th>
+                    <th style={{ padding: '1rem' }}>VENCIMIENTO</th>
                     <th style={{ padding: '1rem' }}>CONSUMO</th>
                     <th style={{ padding: '1rem' }}>ESTADO</th>
                     <th style={{ padding: '1rem' }}>ACCIONES</th>
                 </tr>
                 </thead>
                 <tbody>
-                {users.map(u => (
-                    <tr key={u.id} style={{ backgroundColor: '#f8fafc' }}>
-                    <td style={{ padding: '1.25rem 1rem', borderRadius: '16px 0 0 16px' }}>
-                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{u.full_name}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
-                    </td>
-                    <td style={{ padding: '1.25rem 1rem' }}>{u.plan}</td>
-                    <td style={{ padding: '1.25rem 1rem' }}><span style={{ fontWeight: 800 }}>{u.sent_msgs}</span> / {u.limit_msgs}</td>
-                    <td style={{ padding: '1.25rem 1rem' }}>
-                        <span style={{ padding: '0.4rem 0.8rem', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: u.status === 'Activo' ? '#dcfce7' : '#fee2e2', color: u.status === 'Activo' ? '#166534' : '#991b1b' }}>
-                        {u.status}
-                        </span>
-                    </td>
-                    <td style={{ padding: '1.25rem 1rem', borderRadius: '0 16px 16px 0' }}>
-                        <button 
-                        onClick={() => toggleStatus(u.id, u.status)}
-                        style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', border: 'none', backgroundColor: '#0f172a', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
-                        >
-                        {u.status === 'Activo' ? 'Suspender' : 'Activar'}
-                        </button>
-                    </td>
-                    </tr>
-                ))}
+                {users.map(u => {
+                    const daysLeft = u.next_billing_date 
+                        ? Math.ceil((new Date(u.next_billing_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
+                        : 0;
+                    
+                    return (
+                        <tr key={u.id} style={{ backgroundColor: '#f8fafc' }}>
+                        <td style={{ padding: '1.25rem 1rem', borderRadius: '16px 0 0 16px' }}>
+                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{u.full_name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{u.email}</div>
+                        </td>
+                        <td style={{ padding: '1.25rem 1rem' }}>
+                            <div style={{ fontWeight: 700 }}>{u.plan}</div>
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>ID: {u.id.slice(0,8)}</div>
+                        </td>
+                        <td style={{ padding: '1.25rem 1rem' }}>
+                            <span style={{ 
+                                color: daysLeft < 5 ? '#ef4444' : '#0f172a',
+                                fontWeight: 700
+                            }}>
+                                {daysLeft > 0 ? `${daysLeft} días` : 'Expirado'}
+                            </span>
+                        </td>
+                        <td style={{ padding: '1.25rem 1rem' }}><span style={{ fontWeight: 800 }}>{u.sent_msgs}</span> / {u.limit_msgs}</td>
+                        <td style={{ padding: '1.25rem 1rem' }}>
+                            <span style={{ padding: '0.4rem 0.8rem', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: u.status === 'Activo' ? '#dcfce7' : '#fee2e2', color: u.status === 'Activo' ? '#166534' : '#991b1b' }}>
+                            {u.status}
+                            </span>
+                        </td>
+                        <td style={{ padding: '1.25rem 1rem', borderRadius: '0 16px 16px 0' }}>
+                            <button 
+                            onClick={() => toggleStatus(u.id, u.status)}
+                            style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', border: 'none', backgroundColor: '#0f172a', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}
+                            >
+                            {u.status === 'Activo' ? 'Suspender' : 'Activar'}
+                            </button>
+                        </td>
+                        </tr>
+                    );
+                })}
                 </tbody>
             </table>
             )}

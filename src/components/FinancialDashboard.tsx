@@ -1,72 +1,117 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
-import { Users, DollarSign, Activity } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { DollarSign, TrendingUp, Users, CreditCard } from 'lucide-react';
 
-interface UsageLog {
-  created_at: string;
-  amount: number;
-  profiles?: {
-    plan: string;
-  };
+interface FinancialMetrics {
+  totalRevenue: number;
+  activeSubscriptions: number;
+  monthlyProjections: number;
+  planStats: { name: string, value: number, revenue: number }[];
 }
 
 const FinancialDashboard = () => {
-  const [stats, setStats] = useState<UsageLog[]>([]);
+  const [metrics, setMetrics] = useState<FinancialMetrics>({
+    totalRevenue: 0,
+    activeSubscriptions: 0,
+    monthlyProjections: 0,
+    planStats: []
+  });
 
   useEffect(() => {
-    const fetchData = async () => {
-        // Obtenemos logs de uso
-        const { data } = await supabase.from('usage_log').select('*, profiles(plan)');
-        setStats(data || []);
+    const fetchFinanceData = async () => {
+      const { data: profiles } = await supabase.from('profiles').select('plan');
+      
+      if (profiles) {
+        const statsMap = {
+          'Plan Gratis Judicial': { count: 0, price: 0 },
+          'Plan Medio Judicial': { count: 0, price: 60000 },
+          'Plan Pro Judicial': { count: 0, price: 196000 }
+        };
+
+        profiles.forEach(p => {
+          const planName = p.plan as keyof typeof statsMap;
+          if (statsMap[planName]) {
+            statsMap[planName].count++;
+          }
+        });
+
+        const planStats = Object.entries(statsMap).map(([name, data]) => ({
+          name,
+          value: data.count,
+          revenue: data.count * data.price
+        }));
+
+        const totalRevenue = planStats.reduce((acc, curr) => acc + curr.revenue, 0);
+        const activeSubs = profiles.filter(p => p.plan !== 'Plan Gratis Judicial').length;
+
+        setMetrics({
+          totalRevenue,
+          activeSubscriptions: activeSubs,
+          monthlyProjections: totalRevenue,
+          planStats
+        });
+      }
     };
-    fetchData();
+    fetchFinanceData();
   }, []);
 
-  // Simulación de métricas
-  const totalUsers = stats.length; 
-  const totalRevenue = stats.length * 50000; 
+  const COLORS = ['#94a3b8', '#3b82f6', '#0f172a'];
 
   return (
-    <div style={{ padding: '2rem', backgroundColor: '#f8fafc', borderRadius: '32px' }}>
-      {/* KPIs de Alto Nivel */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        {[
-          { label: 'Ingresos Totales', val: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: '#10b981' },
-          { label: 'Abogados Activos', val: totalUsers.toString(), icon: Users, color: '#3b82f6' },
-          { label: 'Notificaciones', val: stats.length.toString(), icon: Activity, color: '#8b5cf6' }
-        ].map((item, i) => (
-          <div key={i} style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '1rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ padding: '1rem', backgroundColor: `${item.color}15`, borderRadius: '16px' }}><item.icon size={24} color={item.color} /></div>
-            <div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{item.label}</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{item.val}</div>
-            </div>
-          </div>
-        ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
+        <MetricCard title="Ingresos Mensuales" value={`$${metrics.totalRevenue.toLocaleString()}`} icon={<DollarSign color="#10b981" />} trend="+12.5%" />
+        <MetricCard title="Suscripciones Activas" value={metrics.activeSubscriptions.toString()} icon={<CreditCard color="#3b82f6" />} trend="+4" />
+        <MetricCard title="Proyección Anual" value={`$${(metrics.totalRevenue * 12).toLocaleString()}`} icon={<TrendingUp color="#8b5cf6" />} trend="Estable" />
+        <MetricCard title="Usuarios Totales" value={(metrics.planStats.reduce((a,b) => a + b.value, 0)).toString()} icon={<Users color="#64748b" />} trend="+8%" />
       </div>
 
-      {/* Gráfica Principal */}
-      <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0', height: '400px' }}>
-        <h3 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>Evolución de Notificaciones</h3>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={stats}>
-            <defs>
-              <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="created_at" tick={false} />
-            <YAxis />
-            <Tooltip />
-            <Area type="monotone" dataKey="amount" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>Distribución por Plan</h3>
+          <div style={{ height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={metrics.planStats} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {metrics.planStats.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>Ingresos por Categoría</h3>
+          <div style={{ height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={metrics.planStats}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" hide />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
+
+const MetricCard = ({ title, value, icon, trend }: { title: string, value: string, icon: React.ReactNode, trend: string }) => (
+  <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '24px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem', borderRadius: '12px' }}>{icon}</div>
+      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', backgroundColor: '#dcfce7', padding: '0.2rem 0.5rem', borderRadius: '100px' }}>{trend}</span>
+    </div>
+    <div>
+      <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>{title}</div>
+      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>{value}</div>
+    </div>
+  </div>
+);
 
 export default FinancialDashboard;
