@@ -13,9 +13,10 @@ interface SettingsProps {
   onBack: () => void;
   user: string;
   onLogout: () => void;
+  onNavigate: (v: string) => void;
 }
 
-const SettingsView = ({ onBack, user, onLogout }: SettingsProps) => {
+const SettingsView = ({ onBack, user, onLogout, onNavigate }: SettingsProps) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [retentionYears, setRetentionYears] = useState(1);
@@ -99,7 +100,7 @@ const SettingsView = ({ onBack, user, onLogout }: SettingsProps) => {
                   <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{profile?.plan}</div>
                   <div style={{ color: '#64748b', fontSize: '0.9rem' }}>{profile?.limit_msgs} notificaciones certificadas cada mes</div>
                 </div>
-                <button onClick={() => alert("Redireccionando a planes...")} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#0f172a', color: 'white', borderRadius: '12px', fontWeight: 700 }}>Mejorar Plan</button>
+                <button onClick={() => onNavigate('pricing')} style={{ padding: '0.75rem 1.5rem', backgroundColor: '#0f172a', color: 'white', borderRadius: '12px', fontWeight: 700 }}>Mejorar Plan</button>
               </div>
             </section>
 

@@ -127,7 +127,7 @@ function App() {
   }
 
   if (view === 'settings' && user) {
-    return <SettingsView onBack={() => setView('dashboard')} user={user} onLogout={handleLogout} />;
+    return <SettingsView onBack={() => setView('dashboard')} user={user} onLogout={handleLogout} onNavigate={(v) => setView(v as any)} />;
   }
 
   return (
