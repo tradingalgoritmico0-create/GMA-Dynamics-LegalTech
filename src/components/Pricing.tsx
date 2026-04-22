@@ -1,5 +1,4 @@
-import { motion } from 'framer-motion';
-import { CheckCircle2, Shield, Zap, Crown } from 'lucide-react';
+import { Shield, Zap, Crown } from 'lucide-react';
 import { WompiCheckout } from './WompiCheckout';
 
 const Pricing = () => {
@@ -9,8 +8,8 @@ const Pricing = () => {
       id: "Plan Gratis Judicial",
       price: 0,
       limit: 5,
-      description: "Ideal para abogados independientes que inician su transformación digital.",
-      features: ["5 Notificaciones certificadas / mes", "Certificados SHA-256 inmutables", "Validación por QR pública", "Mensaje extra: $8.000 COP"],
+      description: "Acceso básico para validar la plataforma.",
+      features: ["5 Notificaciones certificadas (Vitalicio)", "Certificados SHA-256 inmutables", "Validación por QR pública"],
       icon: <Shield size={24} />
     },
     {
@@ -18,8 +17,8 @@ const Pricing = () => {
       id: "Plan Medio Judicial",
       price: 60000,
       limit: 20,
-      description: "Para firmas en crecimiento que requieren un flujo constante de procesos.",
-      features: ["20 Notificaciones certificadas / mes", "Trazabilidad de metadatos completa", "Soporte técnico prioritario", "Mensaje extra: $6.000 COP"],
+      description: "Para firmas en crecimiento.",
+      features: ["20 Notificaciones certificadas / mes", "Trazabilidad completa", "Soporte prioritario"],
       highlight: true,
       icon: <Zap size={24} />
     },
@@ -28,54 +27,41 @@ const Pricing = () => {
       id: "Plan Pro Judicial",
       price: 196000,
       limit: 100,
-      description: "Alta disponibilidad y volumen para departamentos de cobranza y grandes firmas.",
-      features: ["100 Notificaciones certificadas / mes", "Almacenamiento judicial 5 años", "API de integración corporativa", "Mensaje extra: $4.000 COP"],
+      description: "Volumen corporativo de alto rendimiento.",
+      features: ["100 Notificaciones certificadas / mes", "Almacenamiento 5 años", "API Corporativa"],
       highlight: false,
       icon: <Crown size={24} />
     }
   ];
 
   return (
-    <section className="pricing" style={{ padding: '12rem 0', backgroundColor: '#ffffff', position: 'relative', overflow: 'hidden' }}>
-      <div className="container">
-        <div className="pricing-grid" style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', 
-          gap: '2rem',
-          alignItems: 'stretch'
-        }}>
+    <section className="pricing" style={{ padding: '8rem 2rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        <h2 style={{ fontSize: '3rem', textAlign: 'center', marginBottom: '4rem', fontWeight: 900 }}>Elija su nivel de blindaje</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
           {tiers.map((tier, i) => (
-            <motion.div 
-              key={i} 
-              style={{ 
-                padding: '4.5rem 3.5rem', 
-                borderRadius: '32px', 
-                backgroundColor: tier.highlight ? 'var(--primary)' : '#ffffff',
-                color: tier.highlight ? '#ffffff' : 'var(--primary)',
-                border: tier.highlight ? 'none' : '1px solid #e2e8f0',
-                display: 'flex', flexDirection: 'column'
-              }}
-            >
-              <h3 style={{ fontSize: '1.85rem', fontWeight: '800', marginBottom: '1.5rem' }}>{tier.name}</h3>
-              <div style={{ fontSize: '3.75rem', fontWeight: '900', marginBottom: '1.5rem' }}>${tier.price.toLocaleString()}</div>
+            <div key={i} style={{ 
+              backgroundColor: tier.highlight ? '#0f172a' : 'white', 
+              color: tier.highlight ? 'white' : '#0f172a',
+              padding: '2.5rem', borderRadius: '32px', border: '1px solid #e2e8f0',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+              display: 'flex', flexDirection: 'column'
+            }}>
+              <div style={{ marginBottom: '1.5rem', color: tier.highlight ? '#3b82f6' : '#3b82f6' }}>{tier.icon}</div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{tier.name}</h3>
+              <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1.5rem', minHeight: '3em' }}>{tier.description}</p>
+              <div style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '2rem' }}>${tier.price.toLocaleString()}</div>
               
-              <div style={{ flexGrow: 1, marginBottom: '4rem' }}>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  {tier.features.map((feature, idx) => (
-                    <li key={idx} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                      <CheckCircle2 size={20} color="#10b981" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ul style={{ listStyle: 'none', padding: 0, marginBottom: '2rem', flexGrow: 1 }}>
+                {tier.features.map((f, idx) => <li key={idx} style={{ marginBottom: '0.5rem', fontSize: '0.9rem' }}>✓ {f}</li>)}
+              </ul>
 
               {tier.price > 0 ? (
                   <WompiCheckout plan={tier.id} amount={tier.price} limit={tier.limit} />
               ) : (
-                  <button disabled style={{ padding: '1.4rem', borderRadius: '18px', backgroundColor: '#cbd5e1' }}>Plan Actual</button>
+                  <button disabled style={{ padding: '1rem', borderRadius: '16px', background: '#e2e8f0', border: 'none', fontWeight: 800 }}>Plan Activo</button>
               )}
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
