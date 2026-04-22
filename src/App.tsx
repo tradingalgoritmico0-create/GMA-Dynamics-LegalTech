@@ -148,10 +148,7 @@ function App() {
       <Hero onStart={() => setView('login')} />
       <div id="solucion"><Features /></div>
       <div id="marco"><LegalFramework /></div>
-      <Pricing onSelectPlan={(plan) => {
-        localStorage.setItem('gma_selected_plan', plan);
-        setView('login');
-      }} />
+      <Pricing />
       <section style={{ backgroundColor: 'var(--primary)', color: 'white', textAlign: 'center', padding: '10rem 0', backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.95)), url("https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80")', backgroundSize: 'cover' }}>
         <div className="container">
           <h2 style={{ color: 'white', marginBottom: '1.5rem', fontSize: '3.5rem', fontWeight: '800', fontFamily: 'var(--font-serif)' }}>Transforme su firma hoy mismo</h2>
