@@ -37,7 +37,11 @@ const Pricing = () => {
   return (
     <section className="pricing" style={{ padding: '8rem 2rem', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '3rem', textAlign: 'center', marginBottom: '4rem', fontWeight: 900 }}>Elija su nivel de blindaje</h2>
+        <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+          <button onClick={() => window.location.href = '/'} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginBottom: '1rem' }}>← Volver al inicio</button>
+          <h1 style={{ fontSize: '1rem', color: '#3b82f6', letterSpacing: '0.1em', textTransform: 'uppercase' }}>GMA Dynamics LegalTech</h1>
+          <h2 style={{ fontSize: '3rem', fontWeight: 900 }}>Seleccionar Plan</h2>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
           {tiers.map((tier, i) => (
             <div key={i} style={{ 
@@ -59,7 +63,7 @@ const Pricing = () => {
               {tier.price > 0 ? (
                   <WompiCheckout plan={tier.id} amount={tier.price} limit={tier.limit} />
               ) : (
-                  <button disabled style={{ padding: '1rem', borderRadius: '16px', background: '#e2e8f0', border: 'none', fontWeight: 800 }}>Plan Activo</button>
+                  <button disabled style={{ padding: '1rem', borderRadius: '16px', background: '#e2e8f0', border: 'none', fontWeight: 800 }}>Plan Actual</button>
               )}
             </div>
           ))}
