@@ -36,6 +36,7 @@ function App() {
             full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
             plan: 'Plan Gratis Judicial',
             limit_msgs: 5,
+            sent_msgs: 0,
             status: 'Activo'
         }]);
         if (!error) {
