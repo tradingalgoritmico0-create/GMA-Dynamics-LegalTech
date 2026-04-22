@@ -14,7 +14,7 @@ import SettingsView from './components/Settings'
 import { supabase } from './lib/supabaseClient'
 
 function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view' | 'settings'>('landing');
+  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view' | 'settings' | 'pricing'>('landing');
   const [user, setUser] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [verifyData, setVerifyData] = useState<{hash: string, caseName: string} | null>(null);
@@ -124,6 +124,19 @@ function App() {
 
   if (view === 'dashboard' && user) {
     return <Dashboard onLogout={handleLogout} user={user} onNavigate={(v) => setView(v as any)} />;
+  }
+
+  if (view === 'pricing') {
+    return (
+        <div style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
+            <nav style={{ padding: '1.5rem 2rem' }}>
+                <button onClick={() => setView('dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                    ← Volver al Dashboard
+                </button>
+            </nav>
+            <Pricing />
+        </div>
+    );
   }
 
   if (view === 'settings' && user) {
