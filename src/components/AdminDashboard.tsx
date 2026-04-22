@@ -37,8 +37,13 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   const toggleStatus = async (userId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'Activo' ? 'Suspendido' : 'Activo';
-    await supabase.from('profiles').update({ status: nextStatus }).eq('id', userId);
-    loadUsers();
+    const { error } = await supabase.from('profiles').update({ status: nextStatus }).eq('id', userId);
+    if (error) {
+        console.error("Error al actualizar estado:", error);
+        alert("No se pudo actualizar el estado.");
+    } else {
+        loadUsers(); // Recargar datos
+    }
   };
 
   return (

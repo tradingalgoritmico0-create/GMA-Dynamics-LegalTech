@@ -53,12 +53,15 @@ function App() {
             setRole('user');
             setView('dashboard');
           } else {
+            // Solo mostrar el modal si realmente no hay perfil
             setShowPlanModal(true);
             setUser(session.user.email || '');
             setRole('user');
             return;
           }
         } catch (err) { 
+          // Si el error es "perfil no encontrado", forzar registro. 
+          // Si es error de conexión, intentar navegar a dashboard.
           console.error("Error al obtener perfil:", err);
         }
       } else {
