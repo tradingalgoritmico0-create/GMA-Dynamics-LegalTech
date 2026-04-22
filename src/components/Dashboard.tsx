@@ -101,7 +101,6 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
     try {
       const { encryptPDF } = await import('@pdfsmaller/pdf-encrypt');
       const pdfBytes = new Uint8Array(await formData.file.arrayBuffer());
-      // BUG-008 FIXED: Usamos un hash derivado de la sesión o una variable de entorno segura (no hardcoded)
       const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { 
         ownerPassword: crypto.randomUUID(), 
         allowModifying: false, 
@@ -112,9 +111,22 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
       const hashBuffer = await crypto.subtle.digest('SHA-256', await encryptedFile.arrayBuffer());
       const fileHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
       
+      // 1. Subir a Supabase Storage (Bucket 'lawsuits')
+      const filePath = `${(await supabase.auth.getUser()).data.user?.id}/${Date.now()}_${formData.file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('lawsuits')
+        .upload(filePath, encryptedFile);
+
+      if (uploadError) throw new Error("Error al subir el archivo judicial.");
+
+      // 2. Generar el Link Judicial Único
+      const judicialLink = `${window.location.origin}/view/${fileHash}`;
+
+      // 3. Enviar a n8n el Link en lugar del archivo (más seguro)
       const n8nData = new FormData();
-      Object.entries(formData).forEach(([k, v]) => v && n8nData.append(k, v));
-      n8nData.set('file', encryptedFile); n8nData.append('hash', fileHash);
+      Object.entries(formData).forEach(([k, v]) => v && n8nData.append(k, v as string));
+      n8nData.append('hash', fileHash);
+      n8nData.append('judicial_link', judicialLink);
       
       const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
       if (!response.ok) throw new Error("Error en el envío. Contacte a soporte.");
@@ -125,6 +137,7 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
         email: formData.email, 
         defendant_id: formData.defendantId, 
         file_hash: fileHash, 
+        storage_path: filePath,
         owner_id: (await supabase.auth.getUser()).data.user?.id 
       }]);
 

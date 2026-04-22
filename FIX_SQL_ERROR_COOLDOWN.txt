@@ -1,0 +1,44 @@
+-- ========================================================================
+-- SOLUCIÓN AL ERROR: column "last_msg_at" does not exist
+-- Copia y pega todo este bloque en el SQL EDITOR de Supabase
+-- ========================================================================
+
+-- 1. Agregar la columna de cooldown a la tabla profiles
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS last_msg_at TIMESTAMPTZ;
+
+-- 2. Refrescar la función de Cooldown para que reconozca la nueva columna
+CREATE OR REPLACE FUNCTION public.check_cooldown_trigger()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_last_msg TIMESTAMPTZ;
+    v_plan TEXT;
+BEGIN
+    -- Obtenemos los datos del usuario actual
+    SELECT last_msg_at, plan INTO v_last_msg, v_plan 
+    FROM public.profiles 
+    WHERE id = auth.uid();
+    
+    -- Lógica: Si es Plan Gratis, validar que hayan pasado 30 minutos
+    IF v_plan = 'Plan Gratis Judicial' AND v_last_msg IS NOT NULL THEN
+        IF v_last_msg > now() - interval '30 minutes' THEN
+            RAISE EXCEPTION 'COOLDOWN_ACTIVE: Espere 30 minutos entre envíos en el Plan Gratis.';
+        END IF;
+    END IF;
+    
+    -- Actualizar el timestamp del último mensaje
+    UPDATE public.profiles SET last_msg_at = now() WHERE id = auth.uid();
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Asegurar que el Trigger esté activo en la tabla de notificaciones
+DROP TRIGGER IF EXISTS tr_cooldown ON public.notifications;
+CREATE TRIGGER tr_cooldown 
+BEFORE INSERT ON public.notifications 
+FOR EACH ROW EXECUTE FUNCTION public.check_cooldown_trigger();
+
+-- ========================================================================
+-- FIN DEL SCRIPT - UNA VEZ EJECUTADO, EL ENVÍO DE MENSAJES FUNCIONARÁ
+-- ========================================================================
