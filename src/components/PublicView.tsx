@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DottedBackground } from './ui/Backgrounds';
@@ -8,6 +8,13 @@ import { DottedBackground } from './ui/Backgrounds';
  * Este componente es el corazón de la prueba legal. Captura la huella digital del demandado.
  */
 
+interface Notification {
+  id: string;
+  case_name: string;
+  file_path: string;
+  file_hash: string;
+}
+
 const PublicView = () => {
   // Extracción manual del ID de la URL (/view/ID)
   const id = window.location.pathname.split('/').pop();
@@ -15,11 +22,11 @@ const PublicView = () => {
   const [cedula, setCedula] = useState('');
   const [loading, setLoading] = useState(false);
   const [authorized, setAuthorized] = useState(false);
-  const [notifData, setNotifData] = useState<any>(null);
+  const [notifData, setNotifData] = useState<Notification | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // 1. Capturar evidencia automáticamente al abrir la página
-  const captureEvidence = async () => {
+  const captureEvidence = useCallback(async () => {
     try {
       const response = await fetch('https://api.ipify.org?format=json');
       const { ip } = await response.json();
@@ -36,11 +43,11 @@ const PublicView = () => {
     } catch (err) {
       console.error("Error capturando evidencia:", err);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     if (id) captureEvidence();
-  }, [id]);
+  }, [id, captureEvidence]);
 
   // 2. Validar acceso por cédula
   const handleAccess = async (e: React.FormEvent) => {
@@ -67,8 +74,9 @@ const PublicView = () => {
 
       setNotifData(notif);
       setAuthorized(true);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message);
+      else setError(String(err));
     } finally {
       setLoading(false);
     }

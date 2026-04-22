@@ -16,8 +16,14 @@ interface SettingsProps {
   onNavigate: (v: string) => void;
 }
 
+interface Profile {
+  full_name: string | null;
+  plan: string;
+  limit_msgs: number;
+}
+
 const SettingsView = ({ onBack, user, onLogout, onNavigate }: SettingsProps) => {
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [retentionYears, setRetentionYears] = useState(1);
 

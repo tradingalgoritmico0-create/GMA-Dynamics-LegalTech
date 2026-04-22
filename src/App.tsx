@@ -13,8 +13,10 @@ import TermsOfService from './components/TermsOfService'
 import SettingsView from './components/Settings'
 import { supabase } from './lib/supabaseClient'
 
+type ViewState = 'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view' | 'settings' | 'pricing';
+
 function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'dashboard' | 'verify' | 'admin' | 'public_view' | 'settings' | 'pricing'>('landing');
+  const [view, setView] = useState<ViewState>('landing');
   const [user, setUser] = useState<string | null>(null);
   const [role, setRole] = useState<'admin' | 'user' | null>(null);
   const [verifyData, setVerifyData] = useState<{hash: string, caseName: string} | null>(null);
@@ -30,7 +32,7 @@ function App() {
     checkPath();
     window.addEventListener('popstate', checkPath);
 
-    const createDefaultProfile = async (authUser: any) => {
+    const createDefaultProfile = async (authUser: { id: string, email?: string, user_metadata?: { full_name?: string } }) => {
         const { error } = await supabase.from('profiles').insert([{
             id: authUser.id,
             full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
@@ -54,7 +56,7 @@ function App() {
         try {
           const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
           
-          if (userEmail === 'admin2577@gma.co' || profile?.role === 'admin') {
+          if (profile?.role === 'admin') {
             setRole('admin');
             setUser(userEmail || null);
             setView('admin');
@@ -68,8 +70,8 @@ function App() {
           } else {
             await createDefaultProfile(session.user);
           }
-        } catch (err) { 
-          console.error("Error al obtener perfil:", err);
+        } catch { 
+          // Error silenciado para producción
         }
       } else {
         setView('landing');
@@ -78,7 +80,7 @@ function App() {
 
     checkInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_IN') {
         checkInitialSession();
       } else if (event === 'SIGNED_OUT') {
@@ -123,15 +125,15 @@ function App() {
   }
 
   if (view === 'dashboard' && user) {
-    return <Dashboard onLogout={handleLogout} user={user} onNavigate={(v) => setView(v as any)} />;
+    return <Dashboard onLogout={handleLogout} user={user} onNavigate={(v: string) => setView(v as ViewState)} />;
   }
 
   if (view === 'pricing') {
     return (
         <div style={{ backgroundColor: '#ffffff', minHeight: '100vh' }}>
             <nav style={{ padding: '1.5rem 2rem' }}>
-                <button onClick={() => setView('dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                    ← Volver al Dashboard
+                <button onClick={() => setView('landing')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                    ← Volver al inicio
                 </button>
             </nav>
             <Pricing />
@@ -140,7 +142,7 @@ function App() {
   }
 
   if (view === 'settings' && user) {
-    return <SettingsView onBack={() => setView('dashboard')} user={user} onLogout={handleLogout} onNavigate={(v) => setView(v as any)} />;
+    return <SettingsView onBack={() => setView('dashboard')} user={user} onLogout={handleLogout} onNavigate={(v: string) => setView(v as ViewState)} />;
   }
 
   return (

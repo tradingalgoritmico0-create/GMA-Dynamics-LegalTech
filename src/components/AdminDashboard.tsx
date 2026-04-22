@@ -3,8 +3,18 @@ import { supabase } from '../lib/supabaseClient';
 import FinancialDashboard from './FinancialDashboard';
 import { Users, BarChart3, LogOut } from 'lucide-react';
 
+interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  plan: string;
+  sent_msgs: number;
+  limit_msgs: number;
+  status: string;
+}
+
 const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'users' | 'finance'>('users');
 
@@ -14,17 +24,13 @@ const AdminDashboard = ({ onLogout }: { onLogout: () => void }) => {
         const { data, error } = await supabase.rpc('get_all_profiles');
         
         if (error) {
-            console.error("Error RPC:", error);
             const { data: fallbackData, error: fallbackError } = await supabase.from('profiles').select('*');
             if (fallbackError) {
-                console.error("Error Fallback:", fallbackError);
                 alert("Error cargando perfiles. Revisa la consola.");
             } else {
-                console.log("Datos recuperados vía Fallback:", fallbackData);
                 setUsers(fallbackData || []);
             }
         } else {
-            console.log("Datos recuperados vía RPC:", data);
             setUsers(data || []);
         }
     } catch (e) {

@@ -45,7 +45,10 @@ const Login = () => {
         if (error) throw error;
       }
       window.location.reload();
-    } catch (err: any) { alert(err.message); } finally { setIsProcessing(false); }
+    } catch (err: unknown) { 
+      if (err instanceof Error) alert(err.message);
+      else alert(String(err));
+    } finally { setIsProcessing(false); }
   };
 
   const handleForgotPassword = async () => {

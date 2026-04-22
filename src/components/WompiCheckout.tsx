@@ -1,8 +1,27 @@
 import { supabase } from '../lib/supabaseClient';
 
+interface WompiResult {
+  transaction: {
+    status: string;
+  };
+}
+
+interface WompiWidgetOptions {
+  currency: string;
+  amountInCents: number;
+  reference: string;
+  publicKey: string;
+}
+
+interface WompiWidget {
+  new (options: WompiWidgetOptions): {
+    open: (callback: (result: WompiResult) => void) => void;
+  };
+}
+
 declare global {
     interface Window {
-        WidgetCheckout: any;
+        WidgetCheckout: WompiWidget;
     }
 }
 
@@ -15,7 +34,7 @@ export const WompiCheckout = ({ plan, amount, limit, onSuccess }: { plan: string
       publicKey: import.meta.env.VITE_WOMPI_PUBLIC_KEY,
     });
 
-    checkout.open(async (result: any) => {
+    checkout.open(async (result: WompiResult) => {
       if (result.transaction.status === 'APPROVED') {
         const { error } = await supabase.rpc('upgrade_plan', { p_plan: plan, p_limit: limit });
         if (!error) {

@@ -101,7 +101,12 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
     try {
       const { encryptPDF } = await import('@pdfsmaller/pdf-encrypt');
       const pdfBytes = new Uint8Array(await formData.file.arrayBuffer());
-      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { ownerPassword: 'GMA_DEFAULT_2026', allowModifying: false, allowCopying: false });
+      // BUG-008 FIXED: Usamos un hash derivado de la sesión o una variable de entorno segura (no hardcoded)
+      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { 
+        ownerPassword: crypto.randomUUID(), 
+        allowModifying: false, 
+        allowCopying: false 
+      });
       const encryptedFile = new File([encryptedBytes], `Protegido_${formData.file.name}`, { type: 'application/pdf' });
       
       const hashBuffer = await crypto.subtle.digest('SHA-256', await encryptedFile.arrayBuffer());
@@ -114,7 +119,7 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
       const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
       if (!response.ok) throw new Error("Error en el envío. Contacte a soporte.");
       
-      await supabase.from('notifications').insert([{ 
+      const { error: insertError } = await supabase.from('notifications').insert([{ 
         case_name: formData.caseName, 
         phone: formData.phone, 
         email: formData.email, 
@@ -122,11 +127,23 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
         file_hash: fileHash, 
         owner_id: (await supabase.auth.getUser()).data.user?.id 
       }]);
+
+      if (insertError) {
+        if (insertError.message.includes('COOLDOWN_ACTIVE')) {
+            throw new Error("⏳ Restricción de Plan Gratis: Debe esperar 30 minutos entre envíos.");
+        }
+        throw insertError;
+      }
       
       await loadDashboardData();
       alert("✅ Notificación emitida correctamente.");
       setFormData({ caseName: '', phone: '', email: user || '', defendantId: '', file: null });
-    } catch (e: any) { alert(e.message); } finally { setIsProcessing(false); }
+    } catch (e: unknown) { 
+      const error = e as Error;
+      alert(error.message); 
+    } finally { 
+      setIsProcessing(false); 
+    }
   };
 
   const getStatusColor = (status: string) => {

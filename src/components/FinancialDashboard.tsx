@@ -3,8 +3,16 @@ import { supabase } from '../lib/supabaseClient';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
 import { Users, DollarSign, Activity } from 'lucide-react';
 
+interface UsageLog {
+  created_at: string;
+  amount: number;
+  profiles?: {
+    plan: string;
+  };
+}
+
 const FinancialDashboard = () => {
-  const [stats, setStats] = useState<any[]>([]);
+  const [stats, setStats] = useState<UsageLog[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
