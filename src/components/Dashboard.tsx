@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { retentionLabel } from '../lib/plans';
 import CertificateViewer from './CertificateViewer';
 import { motion } from 'framer-motion';
 import { 
@@ -44,40 +45,30 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
   const [selectedCert, setSelectedCert] = useState<Notification | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [account, setAccount] = useState<UserAccount | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const loadDashboardData = useCallback(async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) return;
-    
+
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
     if (profile) {
-      const expires = new Date(profile.plan_start_date || profile.updated_at);
-      expires.setDate(expires.getDate() + 30);
-      setAccount({ 
-        username: user, 
-        plan: profile.plan, 
-        limit: profile.limit_msgs, 
-        sent: profile.sent_msgs, 
-        status: profile.status, 
-        expiresAt: expires.toISOString() 
+      setAccount({
+        username: user,
+        plan: profile.plan,
+        limit: profile.limit_msgs,
+        sent: profile.sent_msgs,
+        status: profile.status,
+        expiresAt: profile.next_billing_date || null
       });
     }
 
+    // La retención por plan la aplica la política RLS (catálogo public.plans):
+    // aquí solo se listan las filas que la base ya autorizó.
     const { data: notifs } = await supabase.from('notifications').select('*').eq('owner_id', authUser.id).order('created_at', { ascending: false });
-    
-    if (notifs && profile) {
-      // Lógica de Retención Visual según Plan
-      const now = new Date();
-      const filteredNotifs = notifs.filter(n => {
-        const createdAt = new Date(n.created_at);
-        const diffMonths = (now.getFullYear() - createdAt.getFullYear()) * 12 + (now.getMonth() - createdAt.getMonth());
-        
-        if (profile.plan === 'Plan Gratis Judicial') return diffMonths <= 2;
-        if (profile.plan === 'Plan Medio Judicial') return diffMonths <= 12;
-        return diffMonths <= 60; // Pro: 5 años
-      });
 
-      setNotifications(filteredNotifs.map(n => ({ 
+    if (notifs && profile) {
+      setNotifications(notifs.map(n => ({
         id: n.id, 
         caseName: n.case_name, 
         date: new Date(n.created_at).toLocaleString(), 
@@ -98,72 +89,101 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
     e.preventDefault();
     if (!formData.file || !account) return;
     setIsProcessing(true);
+    setFeedback(null);
+    let notifId: string | null = null;
     try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error('Sesión expirada. Vuelva a iniciar sesión.');
+
+      // 1. Cifrar el PDF y calcular su hash SHA-256
       const { encryptPDF } = await import('@pdfsmaller/pdf-encrypt');
       const pdfBytes = new Uint8Array(await formData.file.arrayBuffer());
-      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, { 
-        ownerPassword: crypto.randomUUID(), 
-        allowModifying: false, 
-        allowCopying: false 
+      const encryptedBytes = await encryptPDF(pdfBytes, formData.defendantId, {
+        ownerPassword: crypto.randomUUID(),
+        allowModifying: false,
+        allowCopying: false
       });
       const encryptedFile = new File([encryptedBytes], `Protegido_${formData.file.name}`, { type: 'application/pdf' });
-      
+
       const hashBuffer = await crypto.subtle.digest('SHA-256', await encryptedFile.arrayBuffer());
       const fileHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-      
-      // 1. Subir a Supabase Storage (Bucket 'lawsuits')
-      const filePath = `${(await supabase.auth.getUser()).data.user?.id}/${Date.now()}_${formData.file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('lawsuits')
-        .upload(filePath, encryptedFile);
 
-      if (uploadError) throw new Error("Error al subir el archivo judicial.");
-
-      // 2. Generar el Link Judicial Único
-      const judicialLink = `${window.location.origin}/view/${fileHash}`;
-
-      // 3. Enviar a n8n el Link en lugar del archivo (más seguro)
-      const n8nData = new FormData();
-      Object.entries(formData).forEach(([k, v]) => v && n8nData.append(k, v as string));
-      n8nData.append('hash', fileHash);
-      n8nData.append('judicial_link', judicialLink);
-      
-      const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
-      if (!response.ok) throw new Error("Error en el envío. Contacte a soporte.");
-      
-      const { error: insertError } = await supabase.from('notifications').insert([{ 
-        case_name: formData.caseName, 
-        phone: formData.phone, 
-        email: formData.email, 
-        defendant_id: formData.defendantId, 
-        file_hash: fileHash, 
+      // 2. INSERT primero: el trigger tr_send_guard valida límite/cooldown/estado
+      //    ANTES de subir nada ni notificar a nadie. Nace en status 'pendiente'.
+      const filePath = `${authUser.id}/${fileHash}.pdf`;
+      const { data: inserted, error: insertError } = await supabase.from('notifications').insert([{
+        case_name: formData.caseName,
+        phone: formData.phone,
+        email: formData.email,
+        defendant_id: formData.defendantId,
+        file_hash: fileHash,
         storage_path: filePath,
-        owner_id: (await supabase.auth.getUser()).data.user?.id 
-      }]);
+        owner_id: authUser.id
+      }]).select('id').single();
 
       if (insertError) {
         if (insertError.message.includes('COOLDOWN_ACTIVE')) {
-            throw new Error("⏳ Restricción de Plan Gratis: Debe esperar 30 minutos entre envíos.");
+          throw new Error('⏳ Restricción de Plan Gratis: debe esperar 30 minutos entre envíos.');
+        }
+        if (insertError.message.includes('LIMIT_REACHED')) {
+          throw new Error('Ha alcanzado el límite de notificaciones de su plan. Mejore su plan para continuar.');
+        }
+        if (insertError.message.includes('ACCOUNT_INACTIVE')) {
+          throw new Error('Su cuenta no está activa. Contacte a soporte.');
+        }
+        if (insertError.message.includes('uq_notifications_file_hash')) {
+          throw new Error('Este documento ya fue emitido anteriormente (hash duplicado).');
         }
         throw insertError;
       }
-      
+      notifId = inserted.id;
+
+      // 3. Subir el PDF cifrado a Storage (carpeta propia del abogado)
+      const { error: uploadError } = await supabase.storage
+        .from('lawsuits')
+        .upload(filePath, encryptedFile);
+      if (uploadError) throw new Error('Error al subir el archivo judicial.');
+
+      // 4. Notificar vía n8n con el enlace judicial (nunca el archivo)
+      const judicialLink = `${window.location.origin}/view/${fileHash}`;
+      const n8nData = new FormData();
+      n8nData.append('caseName', formData.caseName);
+      n8nData.append('phone', formData.phone);
+      n8nData.append('email', formData.email);
+      n8nData.append('defendantId', formData.defendantId);
+      n8nData.append('hash', fileHash);
+      n8nData.append('judicial_link', judicialLink);
+      n8nData.append('notification_id', notifId ?? '');
+
+      const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL, { method: 'POST', body: n8nData });
+      if (!response.ok) throw new Error('Error en el envío. Contacte a soporte.');
+
+      // 5. Confirmar emisión
+      await supabase.from('notifications').update({ status: 'Enviado' }).eq('id', notifId);
+
       await loadDashboardData();
-      alert("✅ Notificación emitida correctamente.");
+      setFeedback({ type: 'success', msg: '✅ Notificación emitida correctamente.' });
       setFormData({ caseName: '', phone: '', email: user || '', defendantId: '', file: null });
-    } catch (e: unknown) { 
+    } catch (e: unknown) {
+      // Compensación: la fila queda como evidencia del intento fallido
+      if (notifId) {
+        await supabase.from('notifications').update({ status: 'Error' }).eq('id', notifId);
+        await loadDashboardData();
+      }
       const error = e as Error;
-      alert(error.message); 
-    } finally { 
-      setIsProcessing(false); 
+      setFeedback({ type: 'error', msg: error.message });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'Leído': return '#10b981';
-      case 'Entregado': return '#3b82f6';
+      case 'Entregado':
+      case 'entregado': return '#3b82f6';
       case 'Enviado': return '#f59e0b';
+      case 'Error': return '#ef4444';
       default: return '#94a3b8';
     }
   };
@@ -325,6 +345,17 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Nueva Emisión</h3>
               </div>
               
+              {feedback && (
+                <div style={{
+                  backgroundColor: feedback.type === 'success' ? '#ecfdf5' : '#fef2f2',
+                  color: feedback.type === 'success' ? '#047857' : '#b91c1c',
+                  padding: '0.9rem 1rem', borderRadius: '12px', marginBottom: '1rem',
+                  fontSize: '0.85rem', fontWeight: 600
+                }}>
+                  {feedback.msg}
+                </div>
+              )}
+
               <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
                   <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '0.5rem' }}>Radicado del Proceso</label>
@@ -373,7 +404,7 @@ const Dashboard = ({ onLogout, user, onNavigate }: { onLogout: () => void, user:
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>Infraestructura Elite</h3>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                Su cuenta cuenta con respaldo judicial completo y almacenamiento de evidencias por {account?.plan === 'Plan Gratis Judicial' ? '2 meses' : (account?.plan === 'Plan Medio Judicial' ? '1 año' : '5 años')}.
+                Su cuenta cuenta con respaldo judicial completo y almacenamiento de evidencias por {retentionLabel(account?.plan)}.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button onClick={() => onNavigate('settings')} style={{ flex: 1, padding: '0.75rem', backgroundColor: '#3b82f6', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700 }}>Mejorar Plan</button>
