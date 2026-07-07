@@ -1,18 +1,31 @@
 // =============================================================================
 // GMA DYNAMICS LEGALTECH — Edge Function: process-payment
 // Runtime: Deno (Supabase Edge Functions) — usa Deno.serve(), NO serve() de std
+//
+// Seguridad:
+//  - El monto se calcula SIEMPRE server-side desde el catálogo de planes.
+//    El body del cliente nunca determina cuánto se cobra.
+//  - El user_id del body debe coincidir con el JWT autenticado.
+//  - Idempotencia por payment_id (índice único en profiles.payment_id).
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.102.1";
 
 interface PaymentRequest {
   token: string;
-  amount: number;
   description: string;
   user_id: string;
   payment_type: "extra" | "upgrade";
   qty?: number;
   plan_id?: string;
+  // Campos mínimos exigidos por la API de pagos de MP (los entrega el brick)
+  payment_method_id: string;
+  issuer_id?: number | string;
+  installments?: number;
+  payer?: {
+    email?: string;
+    identification?: { type: string; number: string };
+  };
 }
 
 interface MercadoPagoResponse {
@@ -24,11 +37,16 @@ interface MercadoPagoResponse {
   message?: string;
 }
 
-const PLAN_DEFINITIONS: Record<string, { name: string; limit: number }> = {
-  gratis: { name: "Plan Inicial (5 Msgs)", limit: 5 },
-  medio:  { name: "Plan Medio Judicial",   limit: 20 },
-  pro:    { name: "Plan Pro Judicial",     limit: 100 },
+// Espejo de public.plans y de src/lib/plans.ts — mantener sincronizados.
+const PLAN_DEFINITIONS: Record<string, { name: string; limit: number; price: number }> = {
+  gratis: { name: "Plan Gratis Judicial", limit: 5,   price: 0 },
+  medio:  { name: "Plan Medio Judicial",  limit: 20,  price: 50000 },
+  pro:    { name: "Plan Pro Judicial",    limit: 100, price: 120000 },
 };
+
+// Precio por mensaje adicional (COP) para payment_type = "extra".
+// AJUSTAR según definición de negocio.
+const PRICE_PER_EXTRA_MSG_COP = 5000;
 
 // Monto mínimo permitido por MercadoPago Colombia para validar tarjeta con capture=false.
 // La reserva se cancela inmediatamente tras la autorización — NO se cobra al usuario.
@@ -47,9 +65,7 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
-// Deno.serve es la API correcta para Supabase Edge Functions (serve() de std está deprecado)
 Deno.serve(async (req: Request) => {
-  // Pre-flight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
@@ -67,26 +83,23 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Body JSON inválido." }, 400);
     }
 
-    const { token, amount, description, user_id, payment_type, qty, plan_id } = body;
+    const { token, description, user_id, payment_type, qty, plan_id, payment_method_id, issuer_id, installments, payer } = body;
 
-    if (!token || !amount || !description || !user_id || !payment_type) {
-      return jsonResponse({ success: false, error: "Parámetros incompletos: token, amount, description, user_id y payment_type son obligatorios." }, 400);
+    if (!token || !description || !user_id || !payment_type || !payment_method_id) {
+      return jsonResponse({ success: false, error: "Parámetros incompletos: token, description, user_id, payment_type y payment_method_id son obligatorios." }, 400);
     }
-    if (payment_type === "extra" && (!qty || qty < 1)) {
-      return jsonResponse({ success: false, error: "qty debe ser >= 1 para pagos de tipo 'extra'." }, 400);
+    if (payment_type === "extra" && (!qty || qty < 1 || qty > 500)) {
+      return jsonResponse({ success: false, error: "qty debe estar entre 1 y 500 para pagos de tipo 'extra'." }, 400);
     }
-    if (payment_type === "upgrade" && !plan_id) {
-      return jsonResponse({ success: false, error: "plan_id es obligatorio para pagos de tipo 'upgrade'." }, 400);
-    }
-    if (payment_type === "upgrade" && plan_id && !PLAN_DEFINITIONS[plan_id]) {
-      return jsonResponse({ success: false, error: `plan_id '${plan_id}' no reconocido. Valores válidos: medio, pro.` }, 400);
+    if (payment_type === "upgrade" && (!plan_id || !PLAN_DEFINITIONS[plan_id])) {
+      return jsonResponse({ success: false, error: `plan_id '${plan_id}' no reconocido. Valores válidos: gratis, medio, pro.` }, 400);
     }
 
     // ── 2. Leer variables de entorno ───────────────────────────────────────
     const SUPABASE_URL      = Deno.env.get("SUPABASE_URL");
     const SERVICE_ROLE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const ANON_KEY          = Deno.env.get("SUPABASE_ANON_KEY");
-    const MP_ACCESS_TOKEN   = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+    const MP_ACCESS_TOKEN   = Deno.env.get("MP_ACCESS_TOKEN");
 
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !ANON_KEY || !MP_ACCESS_TOKEN) {
       console.error("[process-payment] Variables de entorno incompletas");
@@ -113,23 +126,36 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "user_id no coincide con el JWT autenticado." }, 403);
     }
 
-    // ── 4. Cobrar con MercadoPago REST API v1 ─────────────────────────────
-    // notification_url es la URL del webhook mp-webhook para confirmaciones asíncronas
+    // ── 4. Calcular el monto SERVER-SIDE ───────────────────────────────────
+    const isFreePlan = payment_type === "upgrade" && plan_id === "gratis";
+    const chargeAmount = payment_type === "upgrade"
+      ? PLAN_DEFINITIONS[plan_id as string].price
+      : (qty as number) * PRICE_PER_EXTRA_MSG_COP;
+
+    // Plan gratis → autorización de $1.000 COP (capture=false) que se cancela
+    // inmediatamente para validar la tarjeta sin cobrar.
+    const effectiveAmount = isFreePlan ? VERIFY_AMOUNT_COP : chargeAmount;
+
+    if (!isFreePlan && effectiveAmount <= 0) {
+      return jsonResponse({ success: false, error: "Monto de cobro inválido." }, 400);
+    }
+
+    // ── 5. Cobrar con MercadoPago REST API v1 ─────────────────────────────
     const projectUrl = SUPABASE_URL.replace(".supabase.co", "").replace("https://", "");
     const webhookUrl = `https://${projectUrl}.supabase.co/functions/v1/mp-webhook`;
-
-    // Plan gratis → autorización de $1.000 COP (capture=false) que se cancela inmediatamente
-    // para confirmar que la tarjeta es real sin cobrar al usuario.
-    const isFreePlan = payment_type === "upgrade" && plan_id === "gratis";
-    const effectiveAmount = isFreePlan ? VERIFY_AMOUNT_COP : amount;
 
     const mpPayload: Record<string, unknown> = {
       transaction_amount: effectiveAmount,
       token,
       description: isFreePlan ? "Validación de tarjeta — GMA Dynamics" : description,
-      installments: 1,
+      installments: installments ?? 1,
+      payment_method_id,
+      ...(issuer_id !== undefined && issuer_id !== null ? { issuer_id: Number(issuer_id) } : {}),
       capture: !isFreePlan,
-      payer: { email: jwtUser.email ?? "no-email@gma.co" },
+      payer: {
+        email: jwtUser.email ?? payer?.email ?? "no-email@gma.co",
+        ...(payer?.identification ? { identification: payer.identification } : {}),
+      },
       notification_url: webhookUrl,
       metadata: {
         gma_user_id:      user_id,
@@ -163,7 +189,7 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[MP] payment_id=${mpData.id} status=${mpData.status} detail=${mpData.status_detail} verify=${isFreePlan}`);
 
-    // ── 5. Validar estado según tipo de flujo ─────────────────────────────
+    // ── 6. Validar estado según tipo de flujo ─────────────────────────────
     // Plan gratis: exige status="authorized" (capture=false valida con el banco sin cobrar)
     // Resto:      exige status="approved" (cobro real efectivo)
     const requiredStatus = isFreePlan ? "authorized" : "approved";
@@ -177,8 +203,7 @@ Deno.serve(async (req: Request) => {
       }, 402);
     }
 
-    // Si es plan gratis, cancelar la autorización de inmediato para liberar la retención
-    // al titular. La validación ya fue exitosa con el banco emisor.
+    // Si es plan gratis, cancelar la autorización de inmediato para liberar la retención.
     if (isFreePlan) {
       const cancelResp = await fetch(`https://api.mercadopago.com/v1/payments/${mpData.id}`, {
         method: "PUT",
@@ -189,8 +214,8 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({ status: "cancelled" }),
       });
       if (!cancelResp.ok) {
-        // Log pero NO fallar: la validación ya fue exitosa. MP libera la reserva en 7 días
-        // aunque falle el cancel explícito.
+        // Log pero NO fallar: la validación ya fue exitosa. MP libera la reserva
+        // en 7 días aunque falle el cancel explícito.
         const cancelErr = await cancelResp.text();
         console.error(`[MP CANCEL] No se pudo cancelar auth payment_id=${mpData.id}:`, cancelErr);
       } else {
@@ -198,12 +223,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Cliente admin con service_role para bypass de RLS
+    // ── 7. Actualizar el perfil con service_role ──────────────────────────
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
 
-    // Verificar idempotencia: si este payment_id ya fue procesado, no duplicar
+    // Idempotencia: si este payment_id ya fue procesado, no duplicar
     const { data: existingPayment } = await supabaseAdmin
       .from("profiles")
       .select("id")
@@ -215,7 +240,6 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true, payment_id: String(mpData.id), status: mpData.status }, 200);
     }
 
-    // Construir el UPDATE según el tipo de pago
     let profileUpdate: Record<string, unknown>;
 
     if (payment_type === "extra") {
@@ -233,15 +257,18 @@ Deno.serve(async (req: Request) => {
       };
     } else {
       const plan = PLAN_DEFINITIONS[plan_id as string];
-      const planStart = new Date().toISOString();
+      const planStart = new Date();
+      const nextBilling = new Date(planStart);
+      nextBilling.setDate(nextBilling.getDate() + 30);
       profileUpdate = {
-        plan:            plan.name,
-        limit_msgs:      plan.limit,
-        sent_msgs:       0,
-        status:          "Activo",
-        plan_start_date: planStart,
-        updated_at:      planStart,
-        payment_id:      String(mpData.id),
+        plan:              plan.name,
+        limit_msgs:        plan.limit,
+        sent_msgs:         0,
+        status:            "Activo",
+        plan_start_date:   planStart.toISOString(),
+        next_billing_date: nextBilling.toISOString(),
+        updated_at:        planStart.toISOString(),
+        payment_id:        String(mpData.id),
       };
     }
 

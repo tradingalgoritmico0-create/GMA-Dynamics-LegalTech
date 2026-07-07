@@ -42,21 +42,19 @@ Reemplaza `<TU_PROJECT_REF>` con el ID de tu proyecto Supabase
 
 Ir a: **Supabase Dashboard → Settings → Edge Functions → Secrets**
 
-| Nombre                      | Descripción                              | Dónde obtenerlo                             |
-|-----------------------------|------------------------------------------|---------------------------------------------|
-| `MP_ACCESS_TOKEN`           | Access Token de producción de MP         | Panel MP → Credenciales → Producción        |
-| `MP_WEBHOOK_SECRET`         | Clave secreta del webhook (paso 2.3)     | Panel MP → Webhooks → tu endpoint           |
-| `MERCADOPAGO_ACCESS_TOKEN`  | Mismo token (usado en process-payment)   | Panel MP → Credenciales → Producción        |
-| `SUPABASE_URL`              | URL del proyecto Supabase                | Supabase → Settings → API → Project URL     |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clave service_role (NUNCA en frontend)   | Supabase → Settings → API → service_role    |
-| `SUPABASE_ANON_KEY`         | Clave anon (para verificar JWT usuario)  | Supabase → Settings → API → anon key        |
+| Nombre                      | Descripción                                        | Dónde obtenerlo                             |
+|-----------------------------|----------------------------------------------------|---------------------------------------------|
+| `MP_ACCESS_TOKEN`           | Access Token de producción de MP (ambas functions) | Panel MP → Credenciales → Producción        |
+| `MP_WEBHOOK_SECRET`         | Clave secreta del webhook (paso 2.3)               | Panel MP → Webhooks → tu endpoint           |
+| `SUPABASE_URL`              | URL del proyecto Supabase                          | Supabase → Settings → API → Project URL     |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave service_role (NUNCA en frontend)             | Supabase → Settings → API → service_role    |
+| `SUPABASE_ANON_KEY`         | Clave anon (para verificar JWT usuario)            | Supabase → Settings → API → anon key        |
 
 ### Via CLI de Supabase
 
 ```bash
 supabase secrets set MP_ACCESS_TOKEN=APP_USR-xxxxxxxxxxxxxxxxxxxx
 supabase secrets set MP_WEBHOOK_SECRET=tu_clave_secreta_de_mp
-supabase secrets set MERCADOPAGO_ACCESS_TOKEN=APP_USR-xxxxxxxxxxxxxxxxxxxx
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 

@@ -126,16 +126,20 @@ async function updateProfile(
       throw new Error(`gma_plan_id inválido: ${gma_plan_id}`);
     }
     const plan = PLAN_DEFINITIONS[gma_plan_id];
-    const now  = new Date().toISOString();
+    const planStart = new Date();
+    const nextBilling = new Date(planStart);
+    nextBilling.setDate(nextBilling.getDate() + 30);
+    const now = planStart.toISOString();
 
     const { error } = await supabase.from("profiles").update({
-      plan:            plan.name,
-      limit_msgs:      plan.limit,
-      sent_msgs:       0,
-      status:          "Activo",
-      payment_id:      String(mpPaymentId),
-      plan_start_date: now,
-      updated_at:      now,
+      plan:              plan.name,
+      limit_msgs:        plan.limit,
+      sent_msgs:         0,
+      status:            "Activo",
+      payment_id:        String(mpPaymentId),
+      plan_start_date:   now,
+      next_billing_date: nextBilling.toISOString(),
+      updated_at:        now,
     }).eq("id", gma_user_id);
 
     if (error) throw new Error(`Supabase update (upgrade) falló: ${error.message}`);
