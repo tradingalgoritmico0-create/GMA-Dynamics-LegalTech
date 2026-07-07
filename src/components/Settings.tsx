@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { PLANS, retentionLabel } from '../lib/plans';
 import { 
   ArrowLeft, 
   Shield, 
@@ -33,7 +34,7 @@ const SettingsView = ({ onBack, user, onLogout, onNavigate }: SettingsProps) => 
       if (authUser) {
         const { data } = await supabase.from('profiles').select('*').eq('id', authUser.id).single();
         setProfile(data);
-        if (data?.plan === 'Plan Pro Judicial') setRetentionYears(5);
+        if (data?.plan === PLANS.pro.name) setRetentionYears(5);
       }
       setLoading(false);
     };
@@ -96,7 +97,7 @@ const SettingsView = ({ onBack, user, onLogout, onNavigate }: SettingsProps) => 
                   <p style={{ color: '#64748b' }}>Gestione su nivel de suscripción y límites.</p>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderRadius: '100px', backgroundColor: '#eff6ff', color: '#3b82f6', fontSize: '0.8rem', fontWeight: 800 }}>
-                  {profile?.plan === 'Plan Pro Judicial' ? <Crown size={14} /> : <Zap size={14} />}
+                  {profile?.plan === PLANS.pro.name ? <Crown size={14} /> : <Zap size={14} />}
                   ACTIVO
                 </div>
               </div>
@@ -126,18 +127,18 @@ const SettingsView = ({ onBack, user, onLogout, onNavigate }: SettingsProps) => 
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Tiempo de visibilidad activa</span>
                     <span style={{ fontWeight: 800, color: '#3b82f6' }}>
-                      {profile?.plan === 'Plan Gratis Judicial' ? '2 Meses' : (profile?.plan === 'Plan Medio Judicial' ? '1 Año' : `${retentionYears} Años`)}
+                      {profile?.plan === PLANS.pro.name ? `${retentionYears} Años` : retentionLabel(profile?.plan)}
                     </span>
                   </div>
                   <div style={{ width: '100%', height: '8px', backgroundColor: '#e2e8f0', borderRadius: '100px', overflow: 'hidden' }}>
-                    <div style={{ width: profile?.plan === 'Plan Pro Judicial' ? '100%' : '20%', height: '100%', backgroundColor: '#3b82f6' }}></div>
+                    <div style={{ width: profile?.plan === PLANS.pro.name ? '100%' : '20%', height: '100%', backgroundColor: '#3b82f6' }}></div>
                   </div>
                   <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '1rem' }}>
                     * Los documentos legales no son eliminados por motivos de sensibilidad judicial, solo se restringe el acceso visual.
                   </p>
                 </div>
 
-                {profile?.plan === 'Plan Pro Judicial' && (
+                {profile?.plan === PLANS.pro.name && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <label style={{ fontSize: '0.9rem', fontWeight: 600 }}>Ajustar retención:</label>
                     <select 

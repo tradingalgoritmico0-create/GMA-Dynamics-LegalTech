@@ -32,19 +32,15 @@ function App() {
     checkPath();
     window.addEventListener('popstate', checkPath);
 
-    const createDefaultProfile = async (authUser: { id: string, email?: string, user_metadata?: { full_name?: string } }) => {
-        const { error } = await supabase.from('profiles').insert([{
-            id: authUser.id,
-            full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0],
-            plan: 'Plan Gratis Judicial',
-            limit_msgs: 5,
-            sent_msgs: 0,
-            status: 'Activo'
-        }]);
-        if (!error) {
-            setView('dashboard');
-            window.location.reload();
-        }
+    // El perfil lo crea el trigger on_auth_user_created en la base de datos.
+    // Tras un registro recién hecho puede haber una latencia mínima: se reintenta.
+    const fetchProfileWithRetry = async (userId: string, attempts = 3): Promise<{ role: string } | null> => {
+      for (let i = 0; i < attempts; i++) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+        if (profile) return profile;
+        await new Promise(r => setTimeout(r, 700 * (i + 1)));
+      }
+      return null;
     };
 
     const checkInitialSession = async () => {
@@ -54,8 +50,8 @@ function App() {
         const userEmail = session.user.email?.trim().toLowerCase();
 
         try {
-          const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
-          
+          const profile = await fetchProfileWithRetry(session.user.id);
+
           if (profile?.role === 'admin') {
             setRole('admin');
             setUser(userEmail || null);
@@ -67,10 +63,8 @@ function App() {
             setUser(userEmail || null);
             setRole('user');
             setView('dashboard');
-          } else {
-            await createDefaultProfile(session.user);
           }
-        } catch { 
+        } catch {
           // Error silenciado para producción
         }
       } else {
@@ -136,7 +130,10 @@ function App() {
                     ← Volver al inicio
                 </button>
             </nav>
-            <Pricing />
+            <Pricing
+              onRequireLogin={() => setView('login')}
+              onUpgraded={() => setView('dashboard')}
+            />
         </div>
     );
   }
@@ -163,7 +160,10 @@ function App() {
       <Hero onStart={() => setView('login')} />
       <div id="solucion"><Features /></div>
       <div id="marco"><LegalFramework /></div>
-      <Pricing />
+      <Pricing
+        onRequireLogin={() => setView('login')}
+        onUpgraded={() => setView('dashboard')}
+      />
       <section style={{ backgroundColor: 'var(--primary)', color: 'white', textAlign: 'center', padding: '10rem 0', backgroundImage: 'linear-gradient(rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.95)), url("https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80")', backgroundSize: 'cover' }}>
         <div className="container">
           <h2 style={{ color: 'white', marginBottom: '1.5rem', fontSize: '3.5rem', fontWeight: '800', fontFamily: 'var(--font-serif)' }}>Transforme su firma hoy mismo</h2>

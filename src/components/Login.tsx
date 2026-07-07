@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { PLAN_LIST } from '../lib/plans';
 import { motion } from 'framer-motion';
 import { DottedBackground } from './ui/Backgrounds';
 import TermsOfService from './TermsOfService';
@@ -15,11 +16,12 @@ const Login = () => {
   const [showTerms, setShowTerms] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const plans = [
-    { id: 'Plan Gratis Judicial', name: 'Gratis Judicial', description: '5 Notificaciones', price: 'Gratis' },
-    { id: 'Plan Medio Judicial', name: 'Medio Judicial', description: '20 Notificaciones', price: '$50.000 / mes' },
-    { id: 'Plan Pro Judicial', name: 'Pro Judicial', description: '100 Notificaciones', price: '$120.000 / mes' }
-  ];
+  const plans = PLAN_LIST.map(p => ({
+    id: p.name,
+    name: p.name.replace('Plan ', ''),
+    description: `${p.limitMsgs} Notificaciones`,
+    price: p.priceCop === 0 ? 'Gratis' : `$${p.priceCop.toLocaleString('es-CO')} / mes`
+  }));
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,17 +31,16 @@ const Login = () => {
       return;
     }
 
-    // Persistir plan antes de cualquier acción
-    localStorage.setItem('gma_selected_plan', selectedPlan);
-
     setIsProcessing(true);
     try {
       if (isRegistering) {
-        const { error } = await supabase.auth.signUp({ 
-          email, password, options: { data: { full_name: fullName } } 
+        // El perfil lo crea el trigger on_auth_user_created en la base de datos
+        // (siempre en Plan Gratis: los planes de pago se activan tras cobro real).
+        // selected_plan viaja en metadata para dirigir al usuario al checkout.
+        const { error } = await supabase.auth.signUp({
+          email, password, options: { data: { full_name: fullName, selected_plan: selectedPlan } }
         });
         if (error) throw error;
-        // El App.tsx se encarga de crear el perfil con el plan de localStorage
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
