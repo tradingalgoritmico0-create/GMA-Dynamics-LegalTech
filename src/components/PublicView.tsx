@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ShieldAlert, FileCheck, MapPin, Eye, Lock } from 'lucide-react';
 
 interface NotificationData {
   case_name: string;
-  defendant_id: string;
   status: string;
 }
 
@@ -27,58 +26,47 @@ const PublicView = () => {
   }, []);
 
   const fetchBasicInfo = async (h: string) => {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('case_name, status')
-      .eq('file_hash', h)
-      .single();
-    
-    if (error || !data) {
+    // RPC de superficie mínima: solo case_name y status, sin abrir la tabla a anónimos
+    const { data, error } = await supabase.rpc('get_public_notification', { p_hash: h });
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) {
       setError('Enlace judicial no encontrado o expirado.');
     } else {
-      setNotif(data as NotificationData);
+      setNotif(row as NotificationData);
     }
     setLoading(false);
   };
 
-  const captureEvidence = useCallback(async () => {
-    try {
-      const ipRes = await fetch('https://ipapi.co/json/');
-      const geoData = await ipRes.json();
-      return geoData;
-    } catch {
-      return { city: 'Desconocida', country: 'Desconocido', error: 'Geo bloqueada' };
-    }
-  }, []);
-
   const handleVerify = async () => {
     setIsVerifying(true);
     setError('');
-    
+
     try {
-      const geo = await captureEvidence();
-      const { data, error: rpcError } = await supabase.rpc('validate_and_log_access', {
-        p_hash: hash,
-        p_id_number: idNumber,
-        p_ip: geo.ip || '0.0.0.0',
-        p_ua: navigator.userAgent,
-        p_geo: geo
+      // La Edge Function valida la cédula, captura la evidencia forense
+      // server-side (IP real, geo, user-agent) y devuelve la URL firmada.
+      const { data, error: fnError } = await supabase.functions.invoke('judicial-access', {
+        body: { hash, id_number: idNumber },
       });
 
-      if (rpcError) {
-        if (rpcError.message === 'INVALID_ID') throw new Error('La identificación no coincide con el registro judicial.');
-        throw rpcError;
+      if (fnError) {
+        let detail = fnError.message;
+        if ('context' in fnError && fnError.context instanceof Response) {
+          try {
+            const body = await fnError.context.json();
+            detail = body?.error ?? detail;
+          } catch { /* body no-JSON */ }
+        }
+        if (detail.includes('INVALID_ID')) throw new Error('La identificación no coincide con el registro judicial.');
+        if (detail.includes('TOO_MANY_ATTEMPTS')) throw new Error('Demasiados intentos fallidos. Intente de nuevo en 15 minutos.');
+        if (detail.includes('NOT_FOUND')) throw new Error('Enlace judicial no encontrado o expirado.');
+        throw new Error(detail);
       }
 
-      if (data && data[0]) {
-        // En lugar de redirección, obtenemos URL firmada de Supabase Storage
-        const { data: signRes } = await supabase.storage
-          .from('lawsuits')
-          .createSignedUrl(data[0].file_path_out, 3600); // 1 hora de acceso
-        
-        if (signRes?.signedUrl) {
-          setPdfUrl(signRes.signedUrl);
-        }
+      if (data?.success && data.signed_url) {
+        setPdfUrl(data.signed_url);
+      } else {
+        throw new Error(data?.error || 'No se pudo validar el acceso.');
       }
     } catch (e: unknown) {
       const err = e as Error;
